@@ -9,8 +9,8 @@ spec:
     server: https://kubernetes.default.svc
   project: gitops-resources
   sources:
-    - repoURL: 'https://github.com/redhat-appstudio/rhads-services-gitops'
-      targetRevision: HEAD
+    - repoURL: 'https://github.com/smatula/rhads-services-gitops'
+      targetRevision: test_main
       path: 'components/artifactory'
     - repoURL: https://charts.jfrog.io
       chart: artifactory-jcr
@@ -19,8 +19,8 @@ spec:
         releaseName: jfrog-container-registry
         valueFiles:
           - $values/components/artifactory/values.yaml
-    - repoURL: https://github.com/redhat-appstudio/rhads-services-gitops
-      targetRevision: HEAD
+    - repoURL: https://github.com/smatula/rhads-services-gitops
+      targetRevision: test_main
       ref: values
   syncPolicy:
     managedNamespaceMetadata:
