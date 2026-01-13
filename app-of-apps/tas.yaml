@@ -44,12 +44,12 @@ spec:
               target:
                 kind: Securesign
                 name: trusted-artifact-signer
-           - patch: |
+            - patch: |
                 - op: replace
                   path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
                   # Securesign IssuerURL patch
                   value: "{{ index .metadata.annotations "tasIssuer" }}"
-            target:
+              target:
                 kind: Securesign
                 name: trusted-artifact-signer
       syncPolicy:
