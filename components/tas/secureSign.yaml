@@ -22,7 +22,6 @@ spec:
   rekor:
     externalAccess:
       enabled: true
-    externalAccess: true
     rekorSearchUI:
       enabled: true
     signer:
