@@ -158,7 +158,34 @@ spec:
                   helm.sh/resource-policy: keep
                 labels:
                   app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: trusted-artifact-signer
+                password: "$TAS_USER_PASS"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
                 namespace: $TAS_NAMESPACE
+                name: trusted-artifact-signer-clients
+              stringdata:
+                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
                 name: trusted-artifact-signer-clients
               stringdata:
                 trustedArtifactSigner: "$TAS_CLIENT_SECRET"
