@@ -9,4 +9,4 @@ resources:
   #- jenkins.yaml
   #- acs.yaml
   - tpa.yaml
-  # - tas.yaml
+  - tas.yaml
