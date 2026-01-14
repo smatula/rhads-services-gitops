@@ -174,7 +174,7 @@ spec:
                   app: keycloak
                 namespace: $TAS_NAMESPACE
                 name: trusted-artifact-signer-clients
-              stringdata:
+              stringData:
                 trustedArtifactSigner: "$TAS_CLIENT_SECRET"
               ---
               apiVersion: v1
@@ -187,7 +187,7 @@ spec:
                   app: keycloak
                 namespace: $KEYCLOAK_NAMESPACE
                 name: trusted-artifact-signer-clients
-              stringdata:
+              stringData:
                 trustedArtifactSigner: "$TAS_CLIENT_SECRET"
               EOF
               echo "✓ All secrets created/updated"
