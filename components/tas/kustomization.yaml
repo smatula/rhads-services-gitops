@@ -5,9 +5,6 @@ commonAnnotations:
 # Secrets are generated at runtime by ArgoCD Sync hook (see secret-generator/argocd-hook.yaml)
 resources:
   - namespace.yaml
-  - secret-generator/rbac.yaml
-  - secret-generator/argocd-hook.yaml
   - operatorGroup.yaml
-  - realm.yaml
   - subscription.yaml
   - secureSign.yaml

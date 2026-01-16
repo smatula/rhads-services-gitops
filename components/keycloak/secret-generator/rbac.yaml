@@ -4,17 +4,17 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: tas-secret-generator
-  namespace: trusted-artifact-signer
+  name: keycloak-secret-generator
+  namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 ---
-# Role with permissions to create/update secrets and configmaps in tssc-tas
+# Role with permissions to create/update secrets and configmaps in tssc-keycloak
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: tas-secret-generator
-  namespace: trusted-artifact-signer
+  name: keycloak-secret-generator
+  namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 rules:
@@ -22,58 +22,28 @@ rules:
     resources: ["secrets", "configmaps"]
     verbs: ["get", "list", "create", "update", "patch"]
 ---
-# Role with permissions to create/update secrets in tssc-keycloak
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: tas-secret-generator
-  namespace: tssc-keycloak
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "create", "update", "patch"]
----
-# RoleBinding for TAS namespace
+# RoleBinding for keycloak namespace
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: tas-secret-generator
-  namespace: trusted-artifact-signer
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-subjects:
-  - kind: ServiceAccount
-    name: tas-secret-generator
-    namespace: trusted-artifact-signer
-roleRef:
-  kind: Role
-  name: tas-secret-generator
-  apiGroup: rbac.authorization.k8s.io
----
-# RoleBinding for Keycloak namespace
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: tas-secret-generator
+  name: keycloak-secret-generator
   namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 subjects:
   - kind: ServiceAccount
-    name: tas-secret-generator
-    namespace: trusted-artifact-signer
+    name: keycloak-secret-generator
+    namespace: tssc-keycloak
 roleRef:
   kind: Role
-  name: tas-secret-generator
+  name: keycloak-secret-generator
   apiGroup: rbac.authorization.k8s.io
 ---
 # ClusterRole to read IngressController and patch Applications
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: tas-secret-generator-cluster-access
+  name: keycloak-secret-generator-cluster-access
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 rules:
@@ -88,14 +58,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: tas-secret-generator-cluster-access
+  name: keycloak-secret-generator-cluster-access
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 subjects:
   - kind: ServiceAccount
-    name: tas-secret-generator
-    namespace: trusted-artifact-signer
+    name: keycloak-secret-generator
+    namespace: tssc-keycloak
 roleRef:
   kind: ClusterRole
-  name: tas-secret-generator-cluster-access
+  name: keyclaok-secret-generator-cluster-access
   apiGroup: rbac.authorization.k8s.io

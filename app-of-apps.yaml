@@ -11,7 +11,7 @@ spec:
   source:
     path: ./app-of-apps
     repoURL: https://github.com/smatula/rhads-services-gitops.git
-    targetRevision: tas-add-test
+    targetRevision: tas-tpa-keycloak
   syncPolicy:
     automated:
       prune: true

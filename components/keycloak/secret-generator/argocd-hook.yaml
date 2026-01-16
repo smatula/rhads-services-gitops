@@ -1,15 +1,15 @@
 ---
 # ArgoCD Sync Hook - Generates secrets during deployment
 #
-# This hook generates 2 secrets with passwords and credentials at runtime.
+# This hook generates 3 secrets with passwords and credentials at runtime.
 # It preserves existing passwords (idempotent) if secrets already exist.
 #
 # Runs in sync-wave 1 (after RBAC resources in wave 0, before app resources in wave 2+)
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: tas-generate-secrets
-  namespace: trusted-artifact-signer
+  name: keycloak-generate-secrets
+  namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
@@ -18,10 +18,10 @@ spec:
   ttlSecondsAfterFinished: 300
   template:
     metadata:
-      name: tas-generate-secrets
+      name: keycloak-generate-secrets
     spec:
       restartPolicy: Never
-      serviceAccountName: tas-secret-generator
+      serviceAccountName: keycloak-secret-generator
       containers:
         - name: generator
           image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
@@ -32,16 +32,14 @@ spec:
               set -euo pipefail
 
               echo "========================================"
-              echo "TAS Secret Generator - Starting"
+              echo "KEYCLOAK Secret Generator - Starting"
               echo "========================================"
 
               # Set namespace variables
-              TAS_NAMESPACE="trusted-artifact-signer"
               KEYCLOAK_NAMESPACE="tssc-keycloak"
-              REALM="trusted-artifact-signer"
+              REALM="chicken"
 
               echo "Configuration:"
-              echo "  TAS Namespace: $TAS_NAMESPACE"
               echo "  Keycloak Namespace: $KEYCLOAK_NAMESPACE"
               echo "  Realm: $REALM"
               echo ""
@@ -53,33 +51,31 @@ spec:
               echo ""
 
               # Derive values for secret generation
-              TAS_EMAIL="trusted-artifact-signer@${INGRESS_DOMAIN}"
               echo ""
-
               echo "Checking if secrets already exist..."
 
               # Check each secret individually for better debug output
-              TAS_USER_EXISTS=false
-              TAS_CLIENTS_EXISTS=false
+              DB_EXISTS=false
+              REALM_CLIENTS_EXISTS=false
 
-              if oc get secret trusted-artifact-signer-user -n "$TAS_NAMESPACE" &>/dev/null; then
-                echo "  ✓ Secret trusted-artifact-signer-user exists"
-                TAS_USER_EXISTS=true
+              if oc get secret keycloak-pgsql-user -n "$KEYLCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret keycloak-pgsql-user exists"
+                DB_EXISTS=true
               else
-                echo "  ✗ Secret trusted-artifact-signer-user does not exist"
+                echo "  ✗ Secret keycloak-pgsql-user does not exist"
               fi
 
-              if oc get secret trusted-artifact-signer-clients -n "$TAS_NAMESPACE" &>/dev/null; then
-                echo "  ✓ Secret trusted-artifact-signer-clients exists"
-                TAS_CLIENTS_EXISTS=true
+              if oc get secret tpa-realm-chicken-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret tpa-realm-chicken-clients exists"
+                REALM_CLIENTS_EXISTS=true
               else
-                echo "  ✗ Secret trusted-artifact-signer-clients does not exist"
+                echo "  ✗ Secret tpa-realm-chicken-clients does not exist"
               fi
 
               echo ""
 
               # Exit early if all secrets exist
-              if [ "$TAS_USER_EXISTS" = true ] && [ "$TAS_CLIENTS_EXISTS" = true ]; then
+              if [ "$DB_EXISTS" = true ] && [ "$REALM_CLIENTS_EXISTS" = true ]; then
                 echo "All secrets already exist - skipping secret generation"
                 echo "========================================"
                 echo ""
@@ -128,8 +124,11 @@ spec:
 
               # Generate or reuse passwords
               echo "Processing passwords..."
-              TAS_USER_PASS=$(get_or_generate_password "$TAS_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
-              TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$TAS_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
+              KEYCLOAK_USER_DB_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "keycloak-pgsql-user" "password" 16)
+              SEED_STRING=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-admin" "password" 16)
+              PASS_CLI=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "cli")
+              PASS_MANAGER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
+              PASS_USER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
               echo ""
 
               # Create all secrets
@@ -140,55 +139,43 @@ spec:
               kind: Secret
               type: Opaque
               metadata:
-                annotations:
-                  helm.sh/resource-policy: keep
-                labels:
-                  app: keycloak
-                namespace: $TAS_NAMESPACE
-                name: trusted-artifact-signer-user
+                name: keycloak-pgsql-user
+                namespace: $KEYCLOAK_NAMESPACE
               stringData:
-                username: trusted-artifact-signer
-                password: "$TAS_USER_PASS"
+                dbname: keycloak
+                host: keycloak-pgsql.tssc-keycloak.svc
+                user: keycloak
+                port: "5432"
+                password: "$KEYCLOAK_USER_DB_PASS"
               ---
               apiVersion: v1
               kind: Secret
-              type: Opaque
               metadata:
                 annotations:
                   helm.sh/resource-policy: keep
                 labels:
                   app: keycloak
                 namespace: $KEYCLOAK_NAMESPACE
-                name: trusted-artifact-signer-user
+                name: tpa-realm-chicken-admin
+              type: Opaque
               stringData:
-                username: trusted-artifact-signer
-                password: "$TAS_USER_PASS"
+                username: admin
+                password: $SEED_STRING
               ---
               apiVersion: v1
               kind: Secret
-              type: Opaque
-              metadata:
-                annotations:
-                  helm.sh/resource-policy: keep
-                labels:
-                  app: keycloak
-                namespace: $TAS_NAMESPACE
-                name: trusted-artifact-signer-clients
-              stringData:
-                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
-              ---
-              apiVersion: v1
-              kind: Secret
-              type: Opaque
               metadata:
                 annotations:
                   helm.sh/resource-policy: keep
                 labels:
                   app: keycloak
                 namespace: $KEYCLOAK_NAMESPACE
-                name: trusted-artifact-signer-clients
+                name: tpa-realm-chicken-clients
+              type: Opaque
               stringData:
-                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
+                cli: $PASS_CLI
+                testingManager: $PASS_MANAGER
+                testingUser: $PASS_USER
               EOF
               echo "✓ All secrets created/updated"
               echo ""
@@ -198,5 +185,5 @@ spec:
               echo "========================================"
               echo ""
               echo "Summary:"
-              echo "  - 2 Secrets created"
+              echo "  - 3 Secrets created"
               echo "  - Cluster domain: $INGRESS_DOMAIN"

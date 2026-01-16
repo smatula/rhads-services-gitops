@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: tpa-service
   namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -23,64 +25,11 @@ spec:
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/tpa
-        targetRevision: tas-add-test
+        targetRevision: tas-tpa-keycloak
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
-            # - KeycloakRealmImport keycloak-chicken: realm.clients length >= 5, clients[4].redirectUris length >= 5
             # - Application trusted-profile-analyzer: source.helm.parameters length == 2
-            - patch: |
-                - op: replace
-                  path: /spec/host
-                  # Keycloak hostname patch
-                  value: "{{ index .metadata.annotations "KChost" }}"
-              target:
-                kind: Route
-                name: keycloak
-            - patch: |
-                - op: replace
-                  path: /spec/hostname/hostname
-                  # Keycloak hostname patch
-                  value: "{{ index .metadata.annotations "KChost" }}"
-              target:
-                kind: Keycloak
-                name: keycloak
-            - patch: |
-                - op: replace
-                  path: /spec/realm/clients/4/redirectUris/1
-                  # Ensure clients are in expected order before deploying
-                  # Targets 5th client (index 4) in realm.clients; index 1 = TPA console callback URI
-                  value: "{{ index .metadata.annotations "redirect1" }}"
-              target:
-                kind: KeycloakRealmImport
-                name: keycloak-chicken
-            - patch: |
-                - op: replace
-                  path: /spec/realm/clients/4/redirectUris/2
-                  # Ensure clients are in expected order before deploying
-                  # Targets 5th client (index 4) in realm.clients; index 2 = TPA console callback URI with wildcard
-                  value: "{{ index .metadata.annotations "redirect2" }}"
-              target:
-                kind: KeycloakRealmImport
-                name: keycloak-chicken
-            - patch: |
-                - op: replace
-                  path: /spec/realm/clients/4/redirectUris/3
-                  # Ensure clients are in expected order before deploying
-                  # Targets 5th client (index 4) in realm.clients; index 3 = TPA callback URI
-                  value: "{{ index .metadata.annotations "redirect3" }}"
-              target:
-                kind: KeycloakRealmImport
-                name: keycloak-chicken
-            - patch: |
-                - op: replace
-                  path: /spec/realm/clients/4/redirectUris/4
-                  # Ensure clients are in expected order before deploying
-                  # Targets 5th client (index 4) in realm.clients; index 4 = TPA callback URI with wildcard
-                  value: "{{ index .metadata.annotations "redirect4" }}"
-              target:
-                kind: KeycloakRealmImport
-                name: keycloak-chicken
             - patch: |
                 - op: replace
                   path: /spec/source/helm/parameters/0/value
