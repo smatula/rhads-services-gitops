@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: rhads-services-app-of-apps
-  namespace: gitops-resources
+  namespace: openshift-gitops
 spec:
   destination:
     namespace: gitops-resources
@@ -19,3 +19,5 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - ApplyOutOfSyncOnly=true
