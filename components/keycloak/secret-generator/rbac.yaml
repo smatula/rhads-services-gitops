@@ -67,5 +67,5 @@ subjects:
     namespace: tssc-keycloak
 roleRef:
   kind: ClusterRole
-  name: keyclaok-secret-generator-cluster-access
+  name: keycloak-secret-generator-cluster-access
   apiGroup: rbac.authorization.k8s.io
