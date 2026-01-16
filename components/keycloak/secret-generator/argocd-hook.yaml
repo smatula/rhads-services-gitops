@@ -58,7 +58,7 @@ spec:
               DB_EXISTS=false
               REALM_CLIENTS_EXISTS=false
 
-              if oc get secret keycloak-pgsql-user -n "$KEYLCLOAK_NAMESPACE" &>/dev/null; then
+              if oc get secret keycloak-pgsql-user -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
                 echo "  ✓ Secret keycloak-pgsql-user exists"
                 DB_EXISTS=true
               else
