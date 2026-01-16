@@ -15,7 +15,7 @@ spec:
             cluster-service-app: "true"
   template:
     metadata:
-      name: 'keycloak-config-{{name}}'
+      name: 'keycloak-config'
       namespace: gitops-resources
     spec:
       project: gitops-resources
