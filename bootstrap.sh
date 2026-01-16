@@ -35,8 +35,26 @@ spec:
     - gitops-resources
   kustomizeBuildOptions: --enable-alpha-plugins --enable-exec
 ' --type=merge
-}
 
+    echo "Setting ArgoCD Health Check"
+    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
+spec:
+  resourceHealthChecks:
+    - group: argoproj.io
+      kind: Application
+      check: |
+        hs = {}
+        hs.status = "Progressing"
+        hs.message = ""
+        if obj.status ~= nil and obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          if obj.status.health.message ~= nil then
+            hs.message = obj.status.health.message
+          end
+        end
+        return hs
+'
+}
 
 create_namespace_and_AppProject() {
     echo "Creating namespace gitops-resources"

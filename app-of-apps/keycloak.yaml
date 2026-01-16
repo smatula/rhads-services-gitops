@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: tas-service
+  name: keycloak-foundation
   namespace: openshift-gitops
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -15,35 +15,35 @@ spec:
             cluster-service-app: "true"
   template:
     metadata:
-      name: 'tas'
+      name: 'keycloak-{{name}}'
       namespace: gitops-resources
     spec:
       project: gitops-resources
       destination:
         server: https://kubernetes.default.svc
-        namespace: trusted-artifact-signer
+        namespace: tssc-keycloak
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
-        path: ./components/tas
+        path: ./components/keycloak
         targetRevision: tas-tpa-keycloak
         kustomize:
           patches:
             - patch: |
                 - op: replace
-                  path: /spec/fulcio/config/OIDCIssuers/0/Issuer
-                  # Securesign Isuer patch
-                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+                  path: /spec/host
+                  # Keycloak hostname patch
+                  value: "{{ index .metadata.annotations "KChost" }}"
               target:
-                kind: Securesign
-                name: trusted-artifact-signer
+                kind: Route
+                name: keycloak
             - patch: |
                 - op: replace
-                  path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
-                  # Securesign IssuerURL patch
-                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+                  path: /spec/hostname/hostname
+                  # Keycloak hostname patch
+                  value: "{{ index .metadata.annotations "KChost" }}"
               target:
-                kind: Securesign
-                name: trusted-artifact-signer
+                kind: Keycloak
+                name: keycloak
       syncPolicy:
         managedNamespaceMetadata:
           labels:
@@ -54,3 +54,4 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
+
