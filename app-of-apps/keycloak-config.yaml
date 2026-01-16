@@ -31,7 +31,7 @@ spec:
             # Validation note: Ensure target resources meet expected structure:
             # - KeycloakRealmImport keycloak-chicken: realm.clients length >= 5, clients[4].redirectUris length >= 5
             # - KeycloakRealmImport keycloak-chicken: realm.users length >= 5
-           - patch: |
+            - patch: |
                 - op: replace
                   path: /spec/realm/clients/4/redirectUris/1
                   # Ensure clients are in expected order before deploying
