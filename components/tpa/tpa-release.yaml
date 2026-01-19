@@ -4,7 +4,7 @@ metadata:
   name: trusted-profile-analyzer
   namespace: gitops-resources
   annotations:
-    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-wave: "7"
 spec:
   project: gitops-resources
   source:

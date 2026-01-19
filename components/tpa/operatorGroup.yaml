@@ -1,0 +1,21 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhbk-operator
+  namespace: rhbk-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  upgradeStrategy: Default
+  targetNamespaces:
+    - tssc-keycloak
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhtas-operator-group
+  namespace: trusted-artifact-signer
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  upgradeStrategy: Default

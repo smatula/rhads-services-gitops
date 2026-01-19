@@ -3,7 +3,7 @@ apiVersion: route.openshift.io/v1
 metadata:
   annotations:
     route.openshift.io/termination: reencrypt
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: keycloak
   namespace: tssc-keycloak
@@ -26,7 +26,7 @@ apiVersion: v1
 metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: keycloak-tls
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "5"
   namespace: tssc-keycloak
   name: keycloak
 spec:
@@ -54,7 +54,7 @@ apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: keycloak
   namespace: tssc-keycloak

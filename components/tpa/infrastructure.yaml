@@ -4,7 +4,7 @@ metadata:
   name: tpa-pgsql-data
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   accessModes:
     - ReadWriteOnce
@@ -18,7 +18,7 @@ metadata:
   name: tpa-pgsql
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   type: ClusterIP
   ports:
@@ -34,7 +34,7 @@ metadata:
   name: tpa-pgsql-bee
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   selector:
     matchLabels:
@@ -96,7 +96,7 @@ metadata:
   name: keycloak-pgsql-data
   namespace: tssc-keycloak
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   accessModes:
     - ReadWriteOnce
@@ -110,7 +110,7 @@ metadata:
   name: keycloak-pgsql
   namespace: tssc-keycloak
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   type: ClusterIP
   ports:
@@ -126,7 +126,7 @@ metadata:
   name: keycloak-pgsql-bee
   namespace: tssc-keycloak
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   selector:
     matchLabels:
