@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       name: 'tpa'
-      namespace: gitops-resources
+      namespace: openshift-gitops
     spec:
       project: gitops-resources
       destination:

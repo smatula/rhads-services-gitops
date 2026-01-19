@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       name: 'keycloak-config'
-      namespace: gitops-resources
+      namespace: openshift-gitops
     spec:
       project: gitops-resources
       destination:
