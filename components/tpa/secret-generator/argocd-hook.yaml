@@ -62,6 +62,22 @@ spec:
               # Check each secret individually for better debug output
               TPA_DB_EXISTS=false
               REALM_CLIENTS_EXISTS=false
+              TAS_USER_EXISTS=false
+              TAS_CLIENTS_EXISTS=false
+
+              if oc get secret trusted-artifact-signer-user -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-user exists"
+                TAS_USER_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-user does not exist"
+              fi
+
+              if oc get secret trusted-artifact-signer-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-clients exists"
+                TAS_CLIENTS_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-clients does not exist"
+              fi
 
               if oc get secret tpa-pgsql-user -n "$TPA_NAMESPACE" &>/dev/null; then
                 echo "  ✓ Secret tpa-pgsql-user exists"
@@ -80,7 +96,7 @@ spec:
               echo ""
 
               # Exit early if all secrets exist
-              if [ "$TPA_DB_EXISTS" = true ] && [ "$REALM_CLIENTS_EXISTS" = true ]; then
+              if [ "$TPA_DB_EXISTS" = true ] && [ "$REALM_CLIENTS_EXISTS" = true ] && [ "$TAS_USER_EXISTS" = true ] && [ "$TAS_CLIENTS_EXISTS" = true ]; then
                 echo "All secrets already exist - skipping secret generation"
                 echo "========================================"
                 echo ""
@@ -135,6 +151,8 @@ spec:
               PASS_CLI=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "cli")
               PASS_MANAGER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
               PASS_USER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
+              TAS_USER_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
+              TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
               echo ""
 
               # Create all secrets
@@ -241,6 +259,33 @@ spec:
                 oidc_client_id: cli
                 oidc_client_secret: $PASS_CLI
                 supported_cyclonedx_version: "${CYCLONEDX_VER}"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: trusted-artifact-signer
+                password: "$TAS_USER_PASS"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-clients
+              stringData:
+                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
               EOF
               echo "✓ All secrets created/updated"
               echo ""

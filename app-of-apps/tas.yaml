@@ -23,7 +23,7 @@ spec:
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/tas
-        targetRevision: tas-add-test
+        targetRevision: appset_combine
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
