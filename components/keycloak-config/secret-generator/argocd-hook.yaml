@@ -8,7 +8,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: keycloak-generate-secrets
+  name: keycloak-config-generate-secrets
   namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/hook: Sync
@@ -18,10 +18,10 @@ spec:
   ttlSecondsAfterFinished: 300
   template:
     metadata:
-      name: keycloak-generate-secrets
+      name: keycloak-config-generate-secrets
     spec:
       restartPolicy: Never
-      serviceAccountName: keycloak-secret-generator
+      serviceAccountName: keycloak-config-secret-generator
       containers:
         - name: generator
           image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest

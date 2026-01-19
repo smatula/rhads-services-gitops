@@ -4,7 +4,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: keycloak-secret-generator
+  name: keycloak-secret-secret-generator
   namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -13,7 +13,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: keycloak-secret-generator
+  name: keycloak-config-secret-generator
   namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -26,24 +26,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: keycloak-secret-generator
+  name: keycloak-config-secret-generator
   namespace: tssc-keycloak
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 subjects:
   - kind: ServiceAccount
-    name: keycloak-secret-generator
+    name: keycloak-config-secret-generator
     namespace: tssc-keycloak
 roleRef:
   kind: Role
-  name: keycloak-secret-generator
+  name: keycloak-config-secret-generator
   apiGroup: rbac.authorization.k8s.io
 ---
 # ClusterRole to read IngressController and patch Applications
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: keycloak-secret-generator-cluster-access
+  name: keycloak-config-secret-generator-cluster-access
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 rules:
@@ -58,14 +58,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: keycloak-secret-generator-cluster-access
+  name: keycloak-config-secret-generator-cluster-access
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 subjects:
   - kind: ServiceAccount
-    name: keycloak-secret-generator
+    name: keycloak-config-secret-generator
     namespace: tssc-keycloak
 roleRef:
   kind: ClusterRole
-  name: keycloak-secret-generator-cluster-access
+  name: keycloak-config-secret-generator-cluster-access
   apiGroup: rbac.authorization.k8s.io
