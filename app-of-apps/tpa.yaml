@@ -99,7 +99,7 @@ spec:
                 name: trusted-profile-analyzer
             - patch: |
                 - op: replace
-                  path: /spec/realm/users/0/email
+                  path: /spec/realm/users/4/email
                   # TAS email patch
                   value: "{{ index .metadata.annotations "tasEmail" }}"
               target:
