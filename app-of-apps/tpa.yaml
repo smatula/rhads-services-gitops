@@ -97,6 +97,30 @@ spec:
               target:
                 kind: Application
                 name: trusted-profile-analyzer
+            - patch: |
+                - op: replace
+                  path: /spec/realm/users/0/email
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/Issuer
+                  # Securesign Isuer patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
+                  # Securesign IssuerURL patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
       syncPolicy:
         managedNamespaceMetadata:
           labels:
