@@ -3,4 +3,6 @@ kind: Kustomization
 commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 resources:
+  - secret-generator/rbac.yaml
+  - secret-generator/argocd-hook.yaml
   - realm.yaml

@@ -53,6 +53,22 @@ spec:
           end
         end
         return hs
+    - group: argoproj.io
+      kind: ApplicationSet
+      check: |
+        local hs = {}
+        hs.status = "Healthy"
+        hs.message = ""
+        if obj.status ~= nil and obj.status.applicationStatus ~= nil then
+          for _, app in ipairs(obj.status.applicationStatus) do
+            if app.status ~= "Healthy" then
+              hs.status = "Progressing"
+              hs.message = "Waiting for child application: " .. app.application
+              return hs
+            end
+          end
+        end
+        return hs
 '
 }
 
