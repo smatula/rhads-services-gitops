@@ -173,7 +173,7 @@ spec:
                 cli: $PASS_CLI
                 testingManager: $PASS_MANAGER
                 testingUser: $PASS_USER
-             ---
+              ---
               apiVersion: v1
               kind: Secret
               type: Opaque
