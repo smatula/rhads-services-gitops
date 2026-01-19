@@ -13,3 +13,4 @@ resources:
   - keycloak-instance.yaml
   - realm.yaml
   - tpa-release.yaml
+  - secureSign.yaml
