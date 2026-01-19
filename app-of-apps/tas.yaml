@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       name: 'tas'
-      namespace: gitops-resources
+      namespace: openshift-gitops
     spec:
       project: gitops-resources
       destination:
