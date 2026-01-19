@@ -1,7 +1,7 @@
 ---
 # ArgoCD Sync Hook - Generates secrets during deployment
 #
-# This hook generates 2 secrets with passwords and credentials at runtime.
+# This hook generates 4 secrets with passwords and credentials at runtime.
 # It preserves existing passwords (idempotent) if secrets already exist.
 #
 # Runs in sync-wave 1 (after RBAC resources in wave 0, before app resources in wave 2+)
@@ -56,6 +56,8 @@ spec:
 
               # Check each secret individually for better debug output
               REALM_CLIENTS_EXISTS=false
+              TAS_USER_EXISTS=false
+              TAS_CLIENTS_EXISTS=false
 
               if oc get secret tpa-realm-chicken-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
                 echo "  ✓ Secret tpa-realm-chicken-clients exists"
@@ -64,10 +66,24 @@ spec:
                 echo "  ✗ Secret tpa-realm-chicken-clients does not exist"
               fi
 
+              if oc get secret trusted-artifact-signer-user -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-user exists"
+                TAS_USER_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-user does not exist"
+              fi
+
+              if oc get secret trusted-artifact-signer-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-clients exists"
+                TAS_CLIENTS_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-clients does not exist"
+              fi
+
               echo ""
 
               # Exit early if all secrets exist
-              if [ "$REALM_CLIENTS_EXISTS" = true ]; then
+              if [ "$REALM_CLIENTS_EXISTS" = true ] && [ "$TAS_USER_EXISTS" = true ] && [ "$TAS_CLIENTS_EXISTS" = true ]; then
                 echo "All secrets already exist - skipping secret generation"
                 echo "========================================"
                 echo ""
@@ -120,6 +136,9 @@ spec:
               PASS_CLI=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "cli")
               PASS_MANAGER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
               PASS_USER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
+              TAS_USER_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
+              TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
+
               echo ""
 
               # Create all secrets
@@ -154,6 +173,33 @@ spec:
                 cli: $PASS_CLI
                 testingManager: $PASS_MANAGER
                 testingUser: $PASS_USER
+             ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: trusted-artifact-signer
+                password: "$TAS_USER_PASS"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-clients
+              stringData:
+                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
               EOF
               echo "✓ All secrets created/updated"
               echo ""
@@ -163,5 +209,5 @@ spec:
               echo "========================================"
               echo ""
               echo "Summary:"
-              echo "  - 2 Secrets created"
+              echo "  - 4 Secrets created"
               echo "  - Cluster domain: $INGRESS_DOMAIN"
