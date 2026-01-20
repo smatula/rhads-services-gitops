@@ -33,7 +33,7 @@ spec:
             # - KeycloakRealmImport keycloak-chicken: realm.users length >= 5
             - patch: |
                 - op: replace
-                  path: /spec/realm/clients/8/redirectUris/1
+                  path: /spec/realm/clients/7/redirectUris/1
                   # Ensure clients are in expected order before deploying
                   # Targets 5th client (index 4) in realm.clients; index 1 = TPA console callback URI
                   value: "{{ index .metadata.annotations "redirect1" }}"
@@ -42,7 +42,7 @@ spec:
                 name: keycloak-chicken
             - patch: |
                 - op: replace
-                  path: /spec/realm/clients/8/redirectUris/2
+                  path: /spec/realm/clients/7/redirectUris/2
                   # Ensure clients are in expected order before deploying
                   # Targets 5th client (index 4) in realm.clients; index 2 = TPA console callback URI with wildcard
                   value: "{{ index .metadata.annotations "redirect2" }}"
@@ -51,7 +51,7 @@ spec:
                 name: keycloak-chicken
             - patch: |
                 - op: replace
-                  path: /spec/realm/clients/8/redirectUris/3
+                  path: /spec/realm/clients/7/redirectUris/3
                   # Ensure clients are in expected order before deploying
                   # Targets 5th client (index 4) in realm.clients; index 3 = TPA callback URI
                   value: "{{ index .metadata.annotations "redirect3" }}"
@@ -60,7 +60,7 @@ spec:
                 name: keycloak-chicken
             - patch: |
                 - op: replace
-                  path: /spec/realm/clients/8/redirectUris/4
+                  path: /spec/realm/clients/7/redirectUris/4
                   # Ensure clients are in expected order before deploying
                   # Targets 5th client (index 4) in realm.clients; index 4 = TPA callback URI with wildcard
                   value: "{{ index .metadata.annotations "redirect4" }}"

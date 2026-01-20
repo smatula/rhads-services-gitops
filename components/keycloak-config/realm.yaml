@@ -1022,40 +1022,6 @@ spec:
         attributes:
           pkce.code.challenge.method: S256
         authenticationFlowBindingOverrides: {}
-        bearerOnly: true
-        clientAuthenticatorType: client-secret
-        clientId: realm-management
-        consentRequired: false
-        defaultClientScopes:
-          - web-origins
-          - acr
-          - profile
-          - roles
-          - email
-        directAccessGrantsEnabled: false
-        enabled: true
-        frontchannelLogout: false
-        fullScopeAllowed: false
-        implicitFlowEnabled: false
-        name: ${client_realm-management}
-        nodeReRegistrationTimeout: 0
-        notBefore: 0
-        optionalClientScopes:
-          - address
-          - phone
-          - offline_access
-          - microprofile-jwt
-        protocol: openid-connect
-        publicClient: false
-        redirectUris: []
-        serviceAccountsEnabled: false
-        standardFlowEnabled: true
-        surrogateAuthRequired: false
-        webOrigins: []
-      - alwaysDisplayInConsole: false
-        attributes:
-          pkce.code.challenge.method: S256
-        authenticationFlowBindingOverrides: {}
         baseUrl: /admin/chicken/console/
         bearerOnly: false
         clientAuthenticatorType: client-secret
