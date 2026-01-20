@@ -1553,8 +1553,6 @@ spec:
     enabled: true
     enabledEventTypes: []
     eventsEnabled: false
-    eventsListeners:
-      - jboss-logging
     failureFactor: 30
     groups: []
     identityProviderMappers: []
