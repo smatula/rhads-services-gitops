@@ -9,6 +9,6 @@ resources:
   #- jenkins.yaml
   #- acs.yaml
   - keycloak.yaml
-  - keycloak-config.yaml
+  #- keycloak-config.yaml
   #- tpa.yaml
   #- tas.yaml
