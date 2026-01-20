@@ -1252,7 +1252,6 @@ spec:
             protocolMapper: oidc-usersessionmodel-note-mapper
           - config:
               access.token.claim: "true"
-              access.token.claim: "true"
               claim.name: client_id
               id.token.claim: "true"
               introspection.token.claim: "true"
