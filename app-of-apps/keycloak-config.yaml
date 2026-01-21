@@ -67,6 +67,14 @@ spec:
               target:
                 kind: KeycloakRealmImport
                 name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/realm/users/4/email
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
       syncPolicy:
         managedNamespaceMetadata:
           labels:
