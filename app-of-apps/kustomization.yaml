@@ -10,5 +10,5 @@ resources:
   #- acs.yaml
   - keycloak.yaml
   - keycloak-config.yaml
-  #- tpa.yaml
+  - tpa.yaml
   #- tas.yaml
