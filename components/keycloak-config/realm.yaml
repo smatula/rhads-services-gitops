@@ -1315,6 +1315,68 @@ spec:
         standardFlowEnabled: false
         surrogateAuthRequired: false
         webOrigins: []
+      - alwaysDisplayInConsole: false
+        attributes:
+          request.object.signature.alg: RS256
+          user.info.response.signature.alg: RS256
+        authenticationFlowBindingOverrides: {}
+        bearerOnly: false
+        clientAuthenticatorType: client-secret
+        clientId: trusted-artifact-signer
+        secret: "${TRUSTED_ARTIFACT_SIGNER_SECRET}"
+        enabled: true
+        consentRequired: false
+        defaultClientScopes:
+          - profile
+          - email
+        description: Client for Red Hat Trusted Artifact Signer authentication
+        directAccessGrantsEnabled: true
+        frontchannelLogout: false
+        fullScopeAllowed: true
+        implicitFlowEnabled: false
+        name: trusted-artifact-signer
+        nodeReRegistrationTimeout: -1
+        notBefore: 0
+        optionalClientScopes: []
+        protocol: openid-connect
+        protocolMappers:
+          - config:
+              access.token.claim: "true"
+              claim.name: aud
+              claim.value: trusted-artifact-signer
+              id.token.claim: "true"
+              userinfo.token.claim: "true"
+            consentRequired: false
+            name: audience
+            protocol: openid-connect
+            protocolMapper: oidc-hardcoded-claim-mapper
+          - config:
+              claim.name: email
+              id.token.claim: "true"
+              jsonType.label: String
+              user.attribute: email
+              userinfo.token.claim: "true"
+            consentRequired: false
+            name: email
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+          - config:
+              claim.name: email-verified
+              id.token.claim: "true"
+              user.attribute: emailVerified
+              userinfo.token.claim: "true"
+            consentRequired: false
+            name: email-verified
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+        publicClient: true
+        redirectUris:
+          - "*"
+          - "urn:ietf:wg:oauth:2.0:oob"
+        serviceAccountsEnabled: false
+        standardFlowEnabled: true
+        surrogateAuthRequired: false
+        webOrigins: []
     components:
       org.keycloak.keys.KeyProvider:
         - config:
@@ -1732,6 +1794,7 @@ spec:
             description: ${role_query-clients}
             name: query-clients
         security-admin-console: []
+        trusted-artifact-signer: []
         testing-manager: []
         testing-user: []
         cli: []
@@ -1843,6 +1906,20 @@ spec:
         serviceAccountClientId: cli
         totp: false
         username: service-account-cli
+      - username: trusted-artifact-signer
+        email: TAS_EMAIL_PLACEHOLDER
+        credentials:
+          - type: password
+            value: "${TAS_PASSWORD}"
+            temporary: false
+        disableableCredentialTypes: []
+        emailVerified: false
+        enabled: true
+        groups: []
+        notBefore: 0
+        realmRoles: []
+        requiredActions: []
+        totp: false
     verifyEmail: false
     waitIncrementSeconds: 60
     webAuthnPolicyAcceptableAaguids: []
@@ -1883,4 +1960,12 @@ spec:
     SEED_PLACEHOLDER:
       secret:
         name: tpa-realm-chicken-admin
+        key: password
+    TRUSTED_ARTIFACT_SIGNER_SECRET:
+      secret:
+        name: trusted-artifact-signer-clients
+        key: trustedArtifactSigner
+    TAS_PASSWORD:
+      secret:
+        name: trusted-artifact-signer-user
         key: password
