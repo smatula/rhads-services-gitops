@@ -5,10 +5,10 @@ commonAnnotations:
 resources:
   #- multicluster-engine.yaml
   #- jfrog-artifactory-jcr.yaml
-  #- nexus.yaml
+  - nexus.yaml
   #- jenkins.yaml
   #- acs.yaml
-  - keycloak.yaml
-  - keycloak-config.yaml
-  - tpa.yaml
+  #- keycloak.yaml
+  #- keycloak-config.yaml
+  #- tpa.yaml
   #- tas.yaml
