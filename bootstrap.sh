@@ -37,12 +37,18 @@ spec:
 ' --type=merge
 }
 
+Here is the updated function for your bash script.
+
+I have modified the Lua logic to target the status.resources field (which your cluster is using) instead of the standard applicationStatus field. I also added a check for the Missing status you observed, ensuring the ApplicationSet stays in a Progressing state until the child app is actually created and synced.
+
+Updated Bash Function
+Bash
 apply_custom_health_checks() {
     echo "Applying custom health checks via extraConfig..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
-    # We use extraConfig because it maps directly to the argocd-cm ConfigMap data keys.
+    # Using extraConfig to map directly to argocd-cm Data
     cat <<EOF > /tmp/health-patch.yaml
 spec:
   extraConfig:
@@ -50,19 +56,34 @@ spec:
       argoproj.io/ApplicationSet:
         health.lua: |
           local hs = { status = "Healthy", message = "All apps are healthy" }
-          if obj.status ~= nil and obj.status.applicationStatus ~= nil then
-            for _, app in ipairs(obj.status.applicationStatus) do
-              if app.status == "Degraded" then
-                return { status = "Degraded", message = "Child app " .. app.application .. " is Degraded" }
+          -- Logic specifically for 'status.resources' as seen in your cluster
+          if obj.status ~= nil and obj.status.resources ~= nil then
+            local count = 0
+            for _, res in ipairs(obj.status.resources) do
+              count = count + 1
+              local health = "Unknown"
+              if res.health ~= nil and res.health.status ~= nil then
+                health = res.health.status
               end
-              if app.status == "Progressing" or app.status == "Unknown" or app.status == "Waiting" or app.syncStatus == "OutOfSync" then
+
+              -- Priority 1: Degraded
+              if health == "Degraded" then
+                return { status = "Degraded", message = "Child app " .. res.name .. " is Degraded" }
+              end
+              
+              -- Priority 2: Progressing/Syncing
+              if health == "Progressing" or health == "Missing" or health == "Unknown" or res.status == "OutOfSync" then
                 hs.status = "Progressing"
-                hs.message = "Child app " .. app.application .. " is " .. (app.status or "Syncing")
+                hs.message = "Child app " .. res.name .. " is " .. health .. " / " .. (res.status or "Syncing")
               end
+            end
+            if count == 0 then
+              return { status = "Progressing", message = "No resources generated yet" }
             end
             return hs
           end
-          return { status = "Progressing", message = "Waiting for reconciliation..." }
+          return { status = "Progressing", message = "Waiting for status.resources..." }
+      
       argoproj.io/Application:
         health.lua: |
           local hs = { status = "Progressing", message = "Initializing" }
@@ -77,19 +98,24 @@ EOF
     kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
 
     echo -n "Waiting for ConfigMap to sync: "
-    for i in {1..10}; do
-        if kubectl get cm argocd-cm -n "$NS" -o jsonpath='{.data.resource\.customizations}' | grep -q "ApplicationSet"; then
+    for i in {1..15}; do
+        if kubectl get cm argocd-cm -n "$NS" -o jsonpath='{.data.resource\.customizations}' | grep -q "resources"; then
             echo "OK"
             break
         fi
         echo -n "."
-        sleep 3
+        sleep 2
     done
 
-    echo "Restarting application-controller..."
-    # We use the label here to be safe, but also the known RH name
+    echo "Restarting controllers to apply new Lua logic..."
     kubectl rollout restart deployment/openshift-gitops-applicationset-controller -n "$NS"
-    kubectl rollout restart deployment/openshift-gitops-application-controller -n "$NS" || true
+    
+    # Wait for the main controller to exist before attempting restart
+    if kubectl get deployment/openshift-gitops-application-controller -n "$NS" &>/dev/null; then
+        kubectl rollout restart deployment/openshift-gitops-application-controller -n "$NS"
+    else
+        echo "Main controller not found yet; it will load the config on startup."
+    fi
     
     rm -f /tmp/health-patch.yaml
 }
