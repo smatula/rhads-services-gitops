@@ -38,13 +38,13 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "Applying Final Production Fix (Health + Sync + Tracking)..."
+    echo "Applying Final Production Fix (Health + Sync + Tracking + Auto-Sync)..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
+    local ROOT_APP="rhads-services-app-of-apps"
 
     # 1. Update ArgoCD CR
-    # - Sets tracking to 'annotation' (Fixes the empty grep/Ghost issue)
-    # - Includes the Lua script for AppSets (Health + Sync check)
+    # Sets tracking to 'annotation' to fix the Ghost/Missing status issue
     cat <<EOF > /tmp/health-patch.yaml
 spec:
   resourceTrackingMethod: annotation
@@ -62,7 +62,7 @@ spec:
                 return { status = "Degraded", message = res.name .. " is Degraded" }
               end
               
-              -- The Sync check: AppSet is Progressing until children are Healthy AND Synced
+              -- Requires both Healthy AND Synced to progress waves
               if health ~= "Healthy" or sync ~= "Synced" then
                 hs.status = "Progressing"
                 hs.message = "Waiting for " .. res.name .. " (Health: " .. health .. ", Sync: " .. sync .. ")"
@@ -87,19 +87,31 @@ EOF
     oc adm policy add-role-to-user edit \
       system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
 
-    # 3. Restart Controllers to adopt the new tracking method
-    echo "Restarting controllers..."
-    kubectl rollout restart deployment/"$INSTANCE"-applicationset-controller -n "$NS"
-    kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS"
-    kubectl rollout status deployment/"$INSTANCE"-applicationset-controller -n "$NS" --timeout=60s
-
-    # 4. CRITICAL: Force the App-of-Apps to inject the tracking-ids
-    # This turns the "Ghosts" back into real resources.
-    echo "Triggering hard refresh and sync on root App-of-Apps..."
-    sleep 10
-    # This command forces the parent to re-examine children and apply the new tracking annotations
-    kubectl annotate app rhads-services-app-of-apps -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite
+    # 3. Restart Controllers using Labels (Avoids 'NotFound' errors)
+    echo "Restarting controllers via label selection..."
     
+    # Restart ApplicationSet Controller
+    kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || \
+    kubectl rollout restart deployment -l app.kubernetes.io/part-of=argocd -n "$NS"
+
+    # Restart Main Application Controller (Handles both Deployment and StatefulSet)
+    kubectl rollout restart statefulset -l app.kubernetes.io/name="$INSTANCE"-application-controller -n "$NS" 2>/dev/null || \
+    kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-application-controller -n "$NS" 2>/dev/null || \
+    echo "Note: Manual restart of controller might be needed if labels differ."
+
+    # 4. Trigger Root Sync Loop
+    echo "Starting Sync Loop to clear ghosts and move waves..."
+    for i in {1..3}; do
+        echo "Sync attempt $i for $ROOT_APP..."
+        # Force a hard refresh to inject the new 'annotation' tracking IDs
+        kubectl annotate app/"$ROOT_APP" -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+        
+        # Nudge AppSets to recalculate their status.resources using the new Lua
+        kubectl get appset -n "$NS" -o name | xargs -I {} kubectl label {} -n "$NS" reconciliation-id=$(date +%s) --overwrite 2>/dev/null
+        
+        sleep 20
+    done
+
     rm -f /tmp/health-patch.yaml
 }
 
