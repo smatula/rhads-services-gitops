@@ -38,97 +38,70 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "Applying final production health logic (Health + Sync check)..."
+    echo "Applying Final Production Fix (Health + Sync + Tracking)..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
-    # 1. Patch the ArgoCD Custom Resource
-    # This version requires both Health='Healthy' AND Status='Synced'
+    # 1. Update ArgoCD CR
+    # - Sets tracking to 'annotation' (Fixes the empty grep/Ghost issue)
+    # - Includes the Lua script for AppSets (Health + Sync check)
     cat <<EOF > /tmp/health-patch.yaml
 spec:
+  resourceTrackingMethod: annotation
   extraConfig:
     resource.customizations: |
       argoproj.io/ApplicationSet:
         health.lua: |
           local hs = { status = "Healthy", message = "All apps are healthy and synced" }
           if obj.status ~= nil and obj.status.resources ~= nil then
-            local count = 0
             for _, res in ipairs(obj.status.resources) do
-              count = count + 1
               local health = (res.health and res.health.status) or "Missing"
               local sync = res.status or "Unknown"
               
-              -- 1. Fail if Degraded
               if health == "Degraded" then
                 return { status = "Degraded", message = res.name .. " is Degraded" }
               end
               
-              -- 2. Progressing if not Healthy OR not Synced
+              -- The Sync check: AppSet is Progressing until children are Healthy AND Synced
               if health ~= "Healthy" or sync ~= "Synced" then
                 hs.status = "Progressing"
                 hs.message = "Waiting for " .. res.name .. " (Health: " .. health .. ", Sync: " .. sync .. ")"
               end
             end
-            if count == 0 then return { status = "Progressing", message = "Generating resources" } end
             return hs
           end
-          return { status = "Progressing", message = "Waiting for reconciliation" }
+          return { status = "Progressing", message = "Initializing..." }
+      argoproj.io/Application:
+        health.lua: |
+          local hs = { status = "Progressing", message = "Initializing" }
+          if obj.status ~= nil and obj.status.health ~= nil then
+            hs.status = obj.status.health.status
+            hs.message = obj.status.health.message
+          end
+          return hs
 EOF
 
     kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
 
-    # 2. RBAC permissions (Critical to prevent 'Missing' status)
+    # 2. RBAC: Ensure ApplicationSet controller can manage apps
     oc adm policy add-role-to-user edit \
       system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
 
-    # 3. Restart controllers to load logic
+    # 3. Restart Controllers to adopt the new tracking method
     echo "Restarting controllers..."
     kubectl rollout restart deployment/"$INSTANCE"-applicationset-controller -n "$NS"
     kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS"
-    
-    # 4. Wait for restart to finish
     kubectl rollout status deployment/"$INSTANCE"-applicationset-controller -n "$NS" --timeout=60s
 
+    # 4. CRITICAL: Force the App-of-Apps to inject the tracking-ids
+    # This turns the "Ghosts" back into real resources.
+    echo "Triggering hard refresh and sync on root App-of-Apps..."
+    sleep 10
+    # This command forces the parent to re-examine children and apply the new tracking annotations
+    kubectl annotate app rhads-services-app-of-apps -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite
+    
     rm -f /tmp/health-patch.yaml
 }
-
-#    echo "Setting ArgoCD Health Check"
-#    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
-#spec:
-#  resourceHealthChecks:
-#    - group: argoproj.io
-#      kind: Application
-#      check: |
-#        hs = {}
-#        hs.status = "Progressing"
-#        hs.message = ""
-#        if obj.status ~= nil then
-#          if obj.status.health ~= nil then
-#            hs.status = obj.status.health.status
-#            if obj.status.health.message ~= nil then
-#              hs.message = obj.status.health.message
-#            end
-#          end
-#        end
-#        return hs
-#    - group: argoproj.io
-#      kind: ApplicationSet
-#      check: |
-#        local hs = {}
-#        hs.status = "Healthy"
-#        hs.message = ""
-#        if obj.status ~= nil and obj.status.applicationStatus ~= nil then
-#          for _, app in ipairs(obj.status.applicationStatus) do
-#            if app.status ~= "Healthy" then
-#              hs.status = "Progressing"
-#              hs.message = "Waiting for child application: " .. app.application
-#              return hs
-#            end
-#          end
-#        end
-#        return hs
-#'
-#}
 
 create_namespace_and_AppProject() {
     echo "Creating namespace gitops-resources"
