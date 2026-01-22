@@ -38,44 +38,61 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "Applying custom health checks for ApplicationSet and Application"
+    echo "Applying custom health checks via extraConfig..."
+    local NS="openshift-gitops"
+    local INSTANCE="openshift-gitops"
+
+    # We use extraConfig because it maps directly to the argocd-cm ConfigMap data keys.
+    cat <<EOF > /tmp/health-patch.yaml
+spec:
+  extraConfig:
+    resource.customizations: |
+      argoproj.io/ApplicationSet:
+        health.lua: |
+          local hs = { status = "Healthy", message = "All apps are healthy" }
+          if obj.status ~= nil and obj.status.applicationStatus ~= nil then
+            for _, app in ipairs(obj.status.applicationStatus) do
+              if app.status == "Degraded" then
+                return { status = "Degraded", message = "Child app " .. app.application .. " is Degraded" }
+              end
+              if app.status == "Progressing" or app.status == "Unknown" or app.status == "Waiting" or app.syncStatus == "OutOfSync" then
+                hs.status = "Progressing"
+                hs.message = "Child app " .. app.application .. " is " .. (app.status or "Syncing")
+              end
+            end
+            return hs
+          end
+          return { status = "Progressing", message = "Waiting for reconciliation..." }
+      argoproj.io/Application:
+        health.lua: |
+          local hs = { status = "Progressing", message = "Initializing" }
+          if obj.status ~= nil and obj.status.health ~= nil then
+            hs.status = obj.status.health.status
+            hs.message = obj.status.health.message
+          end
+          return hs
+EOF
+
+    echo "Patching ArgoCD instance..."
+    kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
+
+    echo -n "Waiting for ConfigMap to sync: "
+    for i in {1..10}; do
+        if kubectl get cm argocd-cm -n "$NS" -o jsonpath='{.data.resource\.customizations}' | grep -q "ApplicationSet"; then
+            echo "OK"
+            break
+        fi
+        echo -n "."
+        sleep 3
+    done
+
+    echo "Restarting application-controller..."
+    # We use the label here to be safe, but also the known RH name
+    kubectl rollout restart deployment/openshift-gitops-applicationset-controller -n "$NS"
+    kubectl rollout restart deployment/openshift-gitops-application-controller -n "$NS" || true
     
-    # Define the Lua scripts in a variable to keep the patch command clean
-    local CUSTOM_HEALTH="
-argoproj.io/ApplicationSet:
-  health.lua: |
-    local hs = { status = 'Healthy', message = 'All apps are healthy and synced' }
-    if obj.status ~= nil and obj.status.applicationStatus ~= nil then
-      for _, app in ipairs(obj.status.applicationStatus) do
-        if app.status == 'Degraded' then
-          return { status = 'Degraded', message = 'Child app ' .. app.application .. ' is Degraded' }
-        end
-        if app.status == 'Progressing' or app.status == 'Unknown' or app.status == 'Waiting' or app.syncStatus == 'OutOfSync' then
-          hs.status = 'Progressing'
-          hs.message = 'Child app ' .. app.application .. ' is ' .. (app.status or 'Syncing')
-        end
-      end
-      return hs
-    end
-    return { status = 'Progressing', message = 'Waiting for reconciliation...' }
-
-    argoproj.io/Application:
-      health.lua: |
-        local hs = { status = 'Progressing', message = 'Initializing' }
-        if obj.status ~= nil and obj.status.health ~= nil then
-          hs.status = obj.status.health.status
-          hs.message = obj.status.health.message
-        end
-        return hs
-"
-
-    # Apply the patch to the ArgoCD Custom Resource
-    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p "$(char_count=1; printf '{"spec":{"resourceCustomizations":%q}}' "$CUSTOM_HEALTH")"
-
-    echo "Restarting application-controller to load new health scripts..."
-    kubectl rollout restart deployment/openshift-gitops-application-controller -n openshift-gitops
+    rm -f /tmp/health-patch.yaml
 }
-
 
 #    echo "Setting ArgoCD Health Check"
 #    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
