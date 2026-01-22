@@ -37,18 +37,13 @@ spec:
 ' --type=merge
 }
 
-Here is the updated function for your bash script.
-
-I have modified the Lua logic to target the status.resources field (which your cluster is using) instead of the standard applicationStatus field. I also added a check for the Missing status you observed, ensuring the ApplicationSet stays in a Progressing state until the child app is actually created and synced.
-
-Updated Bash Function
-Bash
 apply_custom_health_checks() {
-    echo "Applying custom health checks via extraConfig..."
+    echo "Pre-configuring ArgoCD health logic before resource creation..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
-    # Using extraConfig to map directly to argocd-cm Data
+    # 1. Define health logic in extraConfig
+    # This ensures that when AppSets are created later, they immediately use this logic.
     cat <<EOF > /tmp/health-patch.yaml
 spec:
   extraConfig:
@@ -56,34 +51,24 @@ spec:
       argoproj.io/ApplicationSet:
         health.lua: |
           local hs = { status = "Healthy", message = "All apps are healthy" }
-          -- Logic specifically for 'status.resources' as seen in your cluster
           if obj.status ~= nil and obj.status.resources ~= nil then
             local count = 0
             for _, res in ipairs(obj.status.resources) do
               count = count + 1
-              local health = "Unknown"
-              if res.health ~= nil and res.health.status ~= nil then
-                health = res.health.status
-              end
-
-              -- Priority 1: Degraded
+              local health = (res.health and res.health.status) or "Unknown"
+              local sync = res.status or "Unknown"
               if health == "Degraded" then
                 return { status = "Degraded", message = "Child app " .. res.name .. " is Degraded" }
               end
-              
-              -- Priority 2: Progressing/Syncing
-              if health == "Progressing" or health == "Missing" or health == "Unknown" or res.status == "OutOfSync" then
+              if health ~= "Healthy" or sync ~= "Synced" then
                 hs.status = "Progressing"
-                hs.message = "Child app " .. res.name .. " is " .. health .. " / " .. (res.status or "Syncing")
+                hs.message = "Waiting for " .. res.name .. " (Health: " .. health .. ", Sync: " .. sync .. ")"
               end
             end
-            if count == 0 then
-              return { status = "Progressing", message = "No resources generated yet" }
-            end
+            if count == 0 then return { status = "Progressing", message = "Generating resources..." } end
             return hs
           end
-          return { status = "Progressing", message = "Waiting for status.resources..." }
-      
+          return { status = "Progressing", message = "Initializing..." }
       argoproj.io/Application:
         health.lua: |
           local hs = { status = "Progressing", message = "Initializing" }
@@ -94,10 +79,17 @@ spec:
           return hs
 EOF
 
-    echo "Patching ArgoCD instance..."
+    # 2. Apply the configuration to the ArgoCD instance
     kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
 
-    echo -n "Waiting for ConfigMap to sync: "
+    # 3. Pre-emptive RBAC fix (Prevents 'Ghost' icons)
+    # This allows the AppSet controller to create Applications once you deploy your AppSets.
+    echo "Pre-authorizing ApplicationSet controller permissions..."
+    oc adm policy add-role-to-user edit \
+      system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
+
+    # 4. Wait for the Operator to update the ConfigMap
+    echo -n "Waiting for ArgoCD configuration sync: "
     for i in {1..15}; do
         if kubectl get cm argocd-cm -n "$NS" -o jsonpath='{.data.resource\.customizations}' | grep -q "resources"; then
             echo "OK"
@@ -107,18 +99,14 @@ EOF
         sleep 2
     done
 
-    echo "Restarting controllers to apply new Lua logic..."
-    kubectl rollout restart deployment/openshift-gitops-applicationset-controller -n "$NS"
-    
-    # Wait for the main controller to exist before attempting restart
-    if kubectl get deployment/openshift-gitops-application-controller -n "$NS" &>/dev/null; then
-        kubectl rollout restart deployment/openshift-gitops-application-controller -n "$NS"
-    else
-        echo "Main controller not found yet; it will load the config on startup."
-    fi
+    # 5. Restart controllers
+    echo "Restarting controllers to load health logic..."
+    kubectl rollout restart deployment/"$INSTANCE"-applicationset-controller -n "$NS"
+    kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS" || true
     
     rm -f /tmp/health-patch.yaml
 }
+
 
 #    echo "Setting ArgoCD Health Check"
 #    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
