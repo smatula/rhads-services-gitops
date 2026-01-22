@@ -39,26 +39,25 @@ spec:
 
 apply_custom_health_checks() {
     echo "Applying custom health checks for ApplicationSet and Application"
-    # We use a heredoc to keep the Lua code readable and avoid escaping issues
-    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge --patch "
-spec:
-  resourceCustomizations: |
-    argoproj.io/ApplicationSet:
-      health.lua: |
-        local hs = { status = 'Healthy', message = 'All apps are healthy and synced' }
-        if obj.status ~= nil and obj.status.applicationStatus ~= nil then
-          for _, app in ipairs(obj.status.applicationStatus) do
-            if app.status == 'Degraded' then
-              return { status = 'Degraded', message = 'Child app ' .. app.application .. ' is Degraded' }
-            end
-            if app.status == 'Progressing' or app.status == 'Unknown' or app.status == 'Waiting' or app.syncStatus == 'OutOfSync' then
-              hs.status = 'Progressing'
-              hs.message = 'Child app ' .. app.application .. ' is ' .. (app.status or 'Syncing')
-            end
-          end
-          return hs
+    
+    # Define the Lua scripts in a variable to keep the patch command clean
+    local CUSTOM_HEALTH="
+argoproj.io/ApplicationSet:
+  health.lua: |
+    local hs = { status = 'Healthy', message = 'All apps are healthy and synced' }
+    if obj.status ~= nil and obj.status.applicationStatus ~= nil then
+      for _, app in ipairs(obj.status.applicationStatus) do
+        if app.status == 'Degraded' then
+          return { status = 'Degraded', message = 'Child app ' .. app.application .. ' is Degraded' }
         end
-        return { status = 'Progressing', message = 'Waiting for reconciliation...' }
+        if app.status == 'Progressing' or app.status == 'Unknown' or app.status == 'Waiting' or app.syncStatus == 'OutOfSync' then
+          hs.status = 'Progressing'
+          hs.message = 'Child app ' .. app.application .. ' is ' .. (app.status or 'Syncing')
+        end
+      end
+      return hs
+    end
+    return { status = 'Progressing', message = 'Waiting for reconciliation...' }
 
     argoproj.io/Application:
       health.lua: |
@@ -69,7 +68,14 @@ spec:
         end
         return hs
 "
+
+    # Apply the patch to the ArgoCD Custom Resource
+    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p "$(char_count=1; printf '{"spec":{"resourceCustomizations":%q}}' "$CUSTOM_HEALTH")"
+
+    echo "Restarting application-controller to load new health scripts..."
+    kubectl rollout restart deployment/openshift-gitops-application-controller -n openshift-gitops
 }
+
 
 #    echo "Setting ArgoCD Health Check"
 #    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
