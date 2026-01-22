@@ -4,6 +4,7 @@ metadata:
   name: keycloak-foundation
   namespace: openshift-gitops
   annotations:
+    argocd.argoproj.io/refresh: "hard"
     argocd.argoproj.io/sync-wave: "1"
 spec:
   goTemplate: true

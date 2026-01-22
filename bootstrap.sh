@@ -38,66 +38,56 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "Applying production health checks (Optimized for Waves)..."
+    echo "Applying final production health logic (Health + Sync check)..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
-    # 1. Update the ArgoCD Custom Resource
-    # The Lua script here focuses on HEALTH to avoid getting stuck on Sync Cache Lag
+    # 1. Patch the ArgoCD Custom Resource
+    # This version requires both Health='Healthy' AND Status='Synced'
     cat <<EOF > /tmp/health-patch.yaml
 spec:
   extraConfig:
     resource.customizations: |
       argoproj.io/ApplicationSet:
         health.lua: |
-          local hs = { status = "Healthy", message = "All apps are healthy" }
+          local hs = { status = "Healthy", message = "All apps are healthy and synced" }
           if obj.status ~= nil and obj.status.resources ~= nil then
+            local count = 0
             for _, res in ipairs(obj.status.resources) do
-              local health = (res.health and res.health.status) or "Unknown"
-
-              -- Priority 1: If anything is Degraded, stop the waves
+              count = count + 1
+              local health = (res.health and res.health.status) or "Missing"
+              local sync = res.status or "Unknown"
+              
+              -- 1. Fail if Degraded
               if health == "Degraded" then
-                return { status = "Degraded", message = "Child app " .. res.name .. " is Degraded" }
+                return { status = "Degraded", message = res.name .. " is Degraded" }
               end
-
-              -- Priority 2: Ignore 'OutOfSync' (res.status) to prevent wave-lag.
-              -- We only care if the child app is Healthy.
-              if health == "Progressing" or health == "Missing" or health == "Unknown" then
+              
+              -- 2. Progressing if not Healthy OR not Synced
+              if health ~= "Healthy" or sync ~= "Synced" then
                 hs.status = "Progressing"
-                hs.message = "Waiting for " .. res.name .. " (Status: " .. health .. ")"
+                hs.message = "Waiting for " .. res.name .. " (Health: " .. health .. ", Sync: " .. sync .. ")"
               end
             end
+            if count == 0 then return { status = "Progressing", message = "Generating resources" } end
             return hs
           end
-          return { status = "Progressing", message = "Initializing ApplicationSet..." }
-
-      argoproj.io/Application:
-        health.lua: |
-          local hs = { status = "Progressing", message = "Initializing" }
-          if obj.status ~= nil and obj.status.health ~= nil then
-            hs.status = obj.status.health.status
-            hs.message = obj.status.health.message
-          end
-          return hs
+          return { status = "Progressing", message = "Waiting for reconciliation" }
 EOF
 
     kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
 
-    # 2. RBAC Fix: Allow the ApplicationSet controller to create Applications (Fixes Ghost icons)
-    echo "Granting ApplicationSet controller 'edit' permissions in $NS..."
+    # 2. RBAC permissions (Critical to prevent 'Missing' status)
     oc adm policy add-role-to-user edit \
       system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
 
-    # 3. Wait for ConfigMap sync and Restart Controllers
-    echo "Restarting controllers to load optimized logic..."
+    # 3. Restart controllers to load logic
+    echo "Restarting controllers..."
     kubectl rollout restart deployment/"$INSTANCE"-applicationset-controller -n "$NS"
-    kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS" || true
+    kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS"
     
-    # 4. Automate the 'Nudge'
-    # We trigger a refresh on everything to ensure they use the new Lua script immediately
-    echo "Performing initial health refresh..."
-    sleep 5
-    kubectl get appset -n "$NS" -o name | xargs -I {} kubectl annotate {} -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null || true
+    # 4. Wait for restart to finish
+    kubectl rollout status deployment/"$INSTANCE"-applicationset-controller -n "$NS" --timeout=60s
 
     rm -f /tmp/health-patch.yaml
 }
