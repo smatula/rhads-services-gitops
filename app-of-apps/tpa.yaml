@@ -4,6 +4,7 @@ metadata:
   name: tpa-service
   namespace: openshift-gitops
   annotations:
+    argocd.argoproj.io/refresh: "hard"
     argocd.argoproj.io/sync-wave: "3"
 spec:
   goTemplate: true
