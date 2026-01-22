@@ -38,12 +38,12 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "Pre-configuring ArgoCD health logic before resource creation..."
+    echo "Applying production health checks (Optimized for Waves)..."
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
-    # 1. Define health logic in extraConfig
-    # This ensures that when AppSets are created later, they immediately use this logic.
+    # 1. Update the ArgoCD Custom Resource
+    # The Lua script here focuses on HEALTH to avoid getting stuck on Sync Cache Lag
     cat <<EOF > /tmp/health-patch.yaml
 spec:
   extraConfig:
@@ -52,23 +52,25 @@ spec:
         health.lua: |
           local hs = { status = "Healthy", message = "All apps are healthy" }
           if obj.status ~= nil and obj.status.resources ~= nil then
-            local count = 0
             for _, res in ipairs(obj.status.resources) do
-              count = count + 1
               local health = (res.health and res.health.status) or "Unknown"
-              local sync = res.status or "Unknown"
+
+              -- Priority 1: If anything is Degraded, stop the waves
               if health == "Degraded" then
                 return { status = "Degraded", message = "Child app " .. res.name .. " is Degraded" }
               end
-              if health ~= "Healthy" or sync ~= "Synced" then
+
+              -- Priority 2: Ignore 'OutOfSync' (res.status) to prevent wave-lag.
+              -- We only care if the child app is Healthy.
+              if health == "Progressing" or health == "Missing" or health == "Unknown" then
                 hs.status = "Progressing"
-                hs.message = "Waiting for " .. res.name .. " (Health: " .. health .. ", Sync: " .. sync .. ")"
+                hs.message = "Waiting for " .. res.name .. " (Status: " .. health .. ")"
               end
             end
-            if count == 0 then return { status = "Progressing", message = "Generating resources..." } end
             return hs
           end
-          return { status = "Progressing", message = "Initializing..." }
+          return { status = "Progressing", message = "Initializing ApplicationSet..." }
+
       argoproj.io/Application:
         health.lua: |
           local hs = { status = "Progressing", message = "Initializing" }
@@ -79,34 +81,26 @@ spec:
           return hs
 EOF
 
-    # 2. Apply the configuration to the ArgoCD instance
     kubectl patch argocd/"$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/health-patch.yaml
 
-    # 3. Pre-emptive RBAC fix (Prevents 'Ghost' icons)
-    # This allows the AppSet controller to create Applications once you deploy your AppSets.
-    echo "Pre-authorizing ApplicationSet controller permissions..."
+    # 2. RBAC Fix: Allow the ApplicationSet controller to create Applications (Fixes Ghost icons)
+    echo "Granting ApplicationSet controller 'edit' permissions in $NS..."
     oc adm policy add-role-to-user edit \
       system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
 
-    # 4. Wait for the Operator to update the ConfigMap
-    echo -n "Waiting for ArgoCD configuration sync: "
-    for i in {1..15}; do
-        if kubectl get cm argocd-cm -n "$NS" -o jsonpath='{.data.resource\.customizations}' | grep -q "resources"; then
-            echo "OK"
-            break
-        fi
-        echo -n "."
-        sleep 2
-    done
-
-    # 5. Restart controllers
-    echo "Restarting controllers to load health logic..."
+    # 3. Wait for ConfigMap sync and Restart Controllers
+    echo "Restarting controllers to load optimized logic..."
     kubectl rollout restart deployment/"$INSTANCE"-applicationset-controller -n "$NS"
     kubectl rollout restart deployment/"$INSTANCE"-application-controller -n "$NS" || true
     
+    # 4. Automate the 'Nudge'
+    # We trigger a refresh on everything to ensure they use the new Lua script immediately
+    echo "Performing initial health refresh..."
+    sleep 5
+    kubectl get appset -n "$NS" -o name | xargs -I {} kubectl annotate {} -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null || true
+
     rm -f /tmp/health-patch.yaml
 }
-
 
 #    echo "Setting ArgoCD Health Check"
 #    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
