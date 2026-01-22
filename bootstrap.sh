@@ -35,44 +35,79 @@ spec:
     - gitops-resources
   kustomizeBuildOptions: --enable-alpha-plugins --enable-exec
 ' --type=merge
+}
 
-    echo "Setting ArgoCD Health Check"
-    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
+apply_custom_health_checks() {
+    echo "Applying custom health checks for ApplicationSet and Application"
+    # We use a heredoc to keep the Lua code readable and avoid escaping issues
+    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge --patch "
 spec:
-  resourceHealthChecks:
-    - group: argoproj.io
-      kind: Application
-      check: |
-        hs = {}
-        hs.status = "Progressing"
-        hs.message = ""
-        if obj.status ~= nil then
-          if obj.status.health ~= nil then
-            hs.status = obj.status.health.status
-            if obj.status.health.message ~= nil then
-              hs.message = obj.status.health.message
-            end
-          end
-        end
-        return hs
-    - group: argoproj.io
-      kind: ApplicationSet
-      check: |
-        local hs = {}
-        hs.status = "Healthy"
-        hs.message = ""
+  resourceCustomizations: |
+    argoproj.io/ApplicationSet:
+      health.lua: |
+        local hs = { status = 'Healthy', message = 'All apps are healthy and synced' }
         if obj.status ~= nil and obj.status.applicationStatus ~= nil then
           for _, app in ipairs(obj.status.applicationStatus) do
-            if app.status ~= "Healthy" then
-              hs.status = "Progressing"
-              hs.message = "Waiting for child application: " .. app.application
-              return hs
+            if app.status == 'Degraded' then
+              return { status = 'Degraded', message = 'Child app ' .. app.application .. ' is Degraded' }
+            end
+            if app.status == 'Progressing' or app.status == 'Unknown' or app.status == 'Waiting' or app.syncStatus == 'OutOfSync' then
+              hs.status = 'Progressing'
+              hs.message = 'Child app ' .. app.application .. ' is ' .. (app.status or 'Syncing')
             end
           end
+          return hs
+        end
+        return { status = 'Progressing', message = 'Waiting for reconciliation...' }
+
+    argoproj.io/Application:
+      health.lua: |
+        local hs = { status = 'Progressing', message = 'Initializing' }
+        if obj.status ~= nil and obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          hs.message = obj.status.health.message
         end
         return hs
-'
+"
 }
+
+#    echo "Setting ArgoCD Health Check"
+#    kubectl patch argocd/openshift-gitops -n openshift-gitops --type=merge -p '
+#spec:
+#  resourceHealthChecks:
+#    - group: argoproj.io
+#      kind: Application
+#      check: |
+#        hs = {}
+#        hs.status = "Progressing"
+#        hs.message = ""
+#        if obj.status ~= nil then
+#          if obj.status.health ~= nil then
+#            hs.status = obj.status.health.status
+#            if obj.status.health.message ~= nil then
+#              hs.message = obj.status.health.message
+#            end
+#          end
+#        end
+#        return hs
+#    - group: argoproj.io
+#      kind: ApplicationSet
+#      check: |
+#        local hs = {}
+#        hs.status = "Healthy"
+#        hs.message = ""
+#        if obj.status ~= nil and obj.status.applicationStatus ~= nil then
+#          for _, app in ipairs(obj.status.applicationStatus) do
+#            if app.status ~= "Healthy" then
+#              hs.status = "Progressing"
+#              hs.message = "Waiting for child application: " .. app.application
+#              return hs
+#            end
+#          end
+#        end
+#        return hs
+#'
+#}
 
 create_namespace_and_AppProject() {
     echo "Creating namespace gitops-resources"
@@ -112,6 +147,7 @@ create_app_of_apps(){
 
 create_subscription
 wait_for_route
+apply_custom_health_checks
 grant_admin_role_to_all_authenticated_users
 patch_argocd_instance
 create_namespace_and_AppProject
