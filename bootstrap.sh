@@ -99,19 +99,6 @@ EOF
     kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-application-controller -n "$NS" 2>/dev/null || \
     echo "Note: Manual restart of controller might be needed if labels differ."
 
-    # 4. Trigger Root Sync Loop
-    echo "Starting Sync Loop to clear ghosts and move waves..."
-    for i in {1..3}; do
-        echo "Sync attempt $i for $ROOT_APP..."
-        # Force a hard refresh to inject the new 'annotation' tracking IDs
-        kubectl annotate app/"$ROOT_APP" -n "$NS" "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-        
-        # Nudge AppSets to recalculate their status.resources using the new Lua
-        kubectl get appset -n "$NS" -o name | xargs -I {} kubectl label {} -n "$NS" reconciliation-id=$(date +%s) --overwrite 2>/dev/null
-        
-        sleep 20
-    done
-
     rm -f /tmp/health-patch.yaml
 }
 
@@ -159,3 +146,22 @@ patch_argocd_instance
 create_namespace_and_AppProject
 register_cluster
 create_app_of_apps
+
+echo "App-of-Apps detected. Starting initial synchronization and tracking injection..."
+
+# 1. Wait for the App object to actually appear in the cluster
+kubectl wait --for=condition=Initialized app/rhads-services-app-of-apps -n openshift-gitops --timeout=60s
+
+# 2. Force the 'Annotation' tracking to take hold
+# This turns the "Ghosts" into real managed resources immediately
+for i in {1..3}; do
+    echo "Syncing Wave $i..."
+    # Hard refresh forces ArgoCD to calculate the tracking-ids using the new 'annotation' method
+    kubectl annotate app/rhads-services-app-of-apps -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite
+    
+    # Nudge the AppSets so they run the Lua health script against the new children
+    kubectl get appset -n openshift-gitops -o name | xargs -I {} kubectl annotate {} -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite
+    
+    sleep 15
+done
+
