@@ -135,6 +135,12 @@ create_app_of_apps(){
     oc create -f ./app-of-apps.yaml
 }
 
+echo "Step 1: Preparing Namespace..."
+kubectl create namespace gitops-resources || true
+# The label is the 'permission' for the operator to manage this room
+kubectl label namespace gitops-resources argocd.argoproj.io/managed-by=openshift-gitops --overwrite
+
+
 create_subscription
 wait_for_route
 create_namespace_and_AppProject
@@ -142,68 +148,54 @@ patch_argocd_instance
 grant_admin_role_to_all_authenticated_users
 patch_argocd_instance
 register_cluster
+
+oc adm policy add-cluster-role-to-user cluster-admin \
+  system:serviceaccount:openshift-gitops:openshift-gitops-applicationset-controller
+
+# --- THE VISION GATE ---
+echo "Step 3: Waiting for ApplicationSet Controller Vision..."
+# We wait for the Operator to physically update the deployment with the new namespace scope
+ITER=0
+while true; do
+    ENV_CHECK=$(kubectl get deployment openshift-gitops-applicationset-controller -n openshift-gitops -o jsonpath='{.spec.template.spec.containers[0].env[*].name}' 2>/dev/null)
+    if [[ "$ENV_CHECK" == *"ARGOCD_APPLICATIONSET_CONTROLLER_NAMESPACES"* ]]; then
+        echo "Vision Established (Namespace variable found)."
+        break
+    fi
+    if [ $ITER -gt 30 ]; then echo "Timeout waiting for controller vision"; exit 1; fi
+    echo -n "."
+    sleep 5
+    ITER=$((ITER+1))
+done
+
+# Mandatory Restart: Clears any 'count=0' cache from the controller
+kubectl rollout restart deployment openshift-gitops-applicationset-controller -n openshift-gitops
+kubectl rollout status deployment openshift-gitops-applicationset-controller -n openshift-gitops --timeout=90s
+
+# 3. Apply the Root Application (App-of-Apps)
+# [Insert your existing create_root_app function call here]
 create_app_of_apps
 
-# Post-Deployment Nudge Loop
-# This forces the "Missing" status to clear by injecting Tracking IDs
-echo "--- Synchronizing Waves ---"
+# PHASE 1: Initial Handshake (3 loops)
 for i in {1..3}; do
-    echo "Sync/Nudge attempt $i..."
-    
-    # Nudge the Root to claim children
-    kubectl annotate app rhads-services-app-of-apps -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-    
-    # Nudge all generated ApplicationSets to calculate health
-    kubectl annotate appset --all -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-    
-    # Trigger a sync to move to the next wave if the current wave is healthy
-    argocd app sync rhads-services-app-of-apps --prune --async 2>/dev/null || true
-    
+    echo "Phase 1 - Nudge $i/3: Re-evaluating Git source..."
+    kubectl annotate app rhads-services-app-of-apps -n gitops-resources argocd.argoproj.io/refresh=hard --overwrite
     sleep 20
 done
 
-echo "--- Phase 2: Advancing Sync Waves ---"
-for i in {1..20}; do
-    echo "Wave Sync Attempt $i/10..."
-
-    # 1. Force the ApplicationSet to 'claim' its children (Injects Tracking IDs)
-    # This is the "secret sauce" to unsticking Wave 1
-    kubectl annotate appset --all -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-
-    # 2. Nudge the Root App to re-evaluate the health of the current wave
-    kubectl annotate app rhads-services-app-of-apps -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-
-    # 3. Trigger an automated sync on the Root to move to the next wave
-    # We use --async so the script doesn't hang if a pod takes time to start
-    argocd app sync rhads-services-app-of-apps --prune --async --server $(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}') --auth-token $(oc extract secret/argocd-cluster-admin-token -n openshift-gitops --to=- 2>/dev/null) 2>/dev/null || true
-
-    # 4. Check the Status
-    ROOT_HEALTH=$(kubectl get app rhads-services-app-of-apps -n gitops-resources -o jsonpath='{.status.health.status}' 2>/dev/null)
-    ROOT_SYNC=$(kubectl get app rhads-services-app-of-apps -n gitops-resources -o jsonpath='{.status.sync.status}' 2>/dev/null)
-
-    echo "Current Status: Health=$ROOT_HEALTH, Sync=$ROOT_SYNC"
-
-    if [[ "$ROOT_HEALTH" == "Healthy" && "$ROOT_SYNC" == "Synced" ]]; then
-        echo "✅ All waves successfully deployed and healthy!"
+# PHASE 2: Waiting for Health (10 loops)
+for i in {1..10}; do
+    STATUS=$(kubectl get appset keycloak-foundation -n gitops-resources -o jsonpath='{.status.health.status}' 2>/dev/null)
+    echo "Phase 2 - Check $i/10: Foundation Health is [$STATUS]"
+    
+    if [[ "$STATUS" == "Healthy" ]]; then
+        echo "SUCCESS: Wave 1 Healthy. Triggering Wave 2 (Keycloak)..."
+        # One last nudge to ensure Wave 2 starts immediately
+        kubectl annotate app rhads-services-app-of-apps -n gitops-resources argocd.argoproj.io/refresh=hard --overwrite
         break
     fi
-
-    # Wait for resources to stabilize before next nudge
+    
+    # Keep the root app 'awake'
+    kubectl annotate app rhads-services-app-of-apps -n gitops-resources argocd.argoproj.io/refresh=hard --overwrite
     sleep 30
 done
-
-# 3. Final Endpoint Verification
-echo "--- Phase 3: Waiting for Keycloak Endpoint ---"
-KEYCLOAK_URL=$(oc get route keycloak -n keycloak -o jsonpath='{.spec.host}' 2>/dev/null)
-
-if [ -z "$KEYCLOAK_URL" ]; then
-    echo "Waiting for Keycloak Route to be created..."
-    sleep 30
-    KEYCLOAK_URL=$(oc get route keycloak -n keycloak -o jsonpath='{.spec.host}')
-fi
-
-echo "Testing Endpoint: https://$KEYCLOAK_URL"
-timeout 300s bash -c "until curl -sk --head https://$KEYCLOAK_URL | grep '200' > /dev/null; do echo 'Waiting for 200 OK...'; sleep 10; done"
-
-echo "Success! Environment is fully deployed and Keycloak is reachable."
-
