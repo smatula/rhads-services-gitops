@@ -27,27 +27,29 @@ grant_admin_role_to_all_authenticated_users() {
 }
 
 patch_argocd_instance() {
-    echo "Setting ArgoCD tracking method to annotation and adding \"gitops-resources\" ns to sourceNamespaces"
-    kubectl patch argocd/openshift-gitops -n openshift-gitops -p '
+    echo "--- Applying Global Health, Tracking & RBAC Logic ---"
+    local NS="openshift-gitops"
+    local INSTANCE="openshift-gitops"
+    local TARGET_NS="gitops-resources"
+
+    # 1. Label the target namespace so Argo CD "claims" it
+    echo "Labeling $TARGET_NS for GitOps management..."
+    kubectl label namespace "$TARGET_NS" argocd.argoproj.io/managed-by="$NS" --overwrite 2>/dev/null
+
+    # 2. Grant RBAC so the ApplicationSet controller can see child Apps in the target namespace
+    echo "Granting ApplicationSet controller 'view' rights on $TARGET_NS..."
+    oc adm policy add-role-to-user view \
+      system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller \
+      -n "$TARGET_NS" 2>/dev/null || true
+
+    # 3. Create the Consolidated Patch File
+    # This combines Health Logic, Tracking Method, and Source Namespaces
+    cat <<EOF > /tmp/argocd-master-patch.yaml
 spec:
   resourceTrackingMethod: annotation
   sourceNamespaces:
-    - gitops-resources
+    - $TARGET_NS
   kustomizeBuildOptions: --enable-alpha-plugins --enable-exec
-' --type=merge
-}
-
-apply_custom_health_checks() {
-    echo "Applying Global Health & Tracking Logic ---"
-    local NS="openshift-gitops"
-    local INSTANCE="openshift-gitops"
-
-    # 1. Create the Patch File
-    # This ensures both ApplicationSets and Applications have the logic
-    # and forces the 'annotation' tracking method cluster-wide.
-    cat <<'EOF' > /tmp/argocd-health-patch.yaml
-spec:
-  resourceTrackingMethod: annotation
   extraConfig:
     resource.customizations: |
       argoproj.io/ApplicationSet:
@@ -81,21 +83,17 @@ spec:
           return hs
 EOF
 
-    # 2. Patch the ArgoCD Custom Resource (Master Config)
-    kubectl patch argocd "$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/argocd-health-patch.yaml
+    # 4. Apply the Patch to the ArgoCD Custom Resource
+    echo "Patching ArgoCD Instance Settings..."
+    kubectl patch argocd "$INSTANCE" -n "$NS" --type=merge --patch-file /tmp/argocd-master-patch.yaml
 
-    # 3. Apply RBAC (Required so AppSet controller can read child App health)
-    oc adm policy add-role-to-user edit \
-      system:serviceaccount:"$NS":"$INSTANCE"-applicationset-controller -n "$NS" 2>/dev/null || true
-
-    # 4. Restart Controllers to load new ConfigMap
+    # 5. Restart Controllers to ensure they pick up the clean ConfigMap
     echo "Restarting GitOps Controllers..."
     kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-applicationset-controller -n "$NS"
-    kubectl rollout restart statefulset -l app.kubernetes.io/name="$INSTANCE"-application-controller -n "$NS" 2>/dev/null || \
-    kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-application-controller -n "$NS"
+    kubectl rollout restart deployment -l app.kubernetes.io/name="$INSTANCE"-server -n "$NS"
 
     echo "Waiting for controllers to recycle..."
-    sleep 30
+    kubectl rollout status deployment "$INSTANCE"-applicationset-controller -n "$NS" --timeout=60s
 }
 
 create_namespace_and_AppProject() {
@@ -121,6 +119,9 @@ spec:
     sourceRepos:
         - '*'
 EOF
+
+    echo "Labeling namespace for GitOps management"
+    kubectl label namespace gitops-resources argocd.argoproj.io/managed-by=openshift-gitops --overwrite
 }
 
 
@@ -136,10 +137,10 @@ create_app_of_apps(){
 
 create_subscription
 wait_for_route
-apply_custom_health_checks
+create_namespace_and_AppProject
+patch_argocd_instance
 grant_admin_role_to_all_authenticated_users
 patch_argocd_instance
-create_namespace_and_AppProject
 register_cluster
 create_app_of_apps
 
@@ -161,23 +162,34 @@ for i in {1..3}; do
     sleep 20
 done
 
-echo "--- Phase 2: Nudging Waves ---"
-for i in {1..5}; do
-    echo "Wave Sync Attempt $i..."
-    # Nudge Parent & Children
-    kubectl annotate app rhads-services-app-of-apps -n  gitops-resources"argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-    kubectl annotate appset --all -n  gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-    
-    # Trigger Sync to move waves
-    argocd app sync rhads-services-app-of-apps --prune --async 2>/dev/null || true
-    
-    # Check if we are done
-    ROOT_HEALTH=$(kubectl get app rhads-services-app-of-apps -n openshift-gitops -o jsonpath='{.status.health.status}' 2>/dev/null)
-    if [ "$ROOT_HEALTH" == "Healthy" ]; then
-        echo "GitOps reports all waves are Healthy!"
+echo "--- Phase 2: Advancing Sync Waves ---"
+for i in {1..20}; do
+    echo "Wave Sync Attempt $i/10..."
+
+    # 1. Force the ApplicationSet to 'claim' its children (Injects Tracking IDs)
+    # This is the "secret sauce" to unsticking Wave 1
+    kubectl annotate appset --all -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+
+    # 2. Nudge the Root App to re-evaluate the health of the current wave
+    kubectl annotate app rhads-services-app-of-apps -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+
+    # 3. Trigger an automated sync on the Root to move to the next wave
+    # We use --async so the script doesn't hang if a pod takes time to start
+    argocd app sync rhads-services-app-of-apps --prune --async --server $(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}') --auth-token $(oc extract secret/argocd-cluster-admin-token -n openshift-gitops --to=- 2>/dev/null) 2>/dev/null || true
+
+    # 4. Check the Status
+    ROOT_HEALTH=$(kubectl get app rhads-services-app-of-apps -n gitops-resources -o jsonpath='{.status.health.status}' 2>/dev/null)
+    ROOT_SYNC=$(kubectl get app rhads-services-app-of-apps -n gitops-resources -o jsonpath='{.status.sync.status}' 2>/dev/null)
+
+    echo "Current Status: Health=$ROOT_HEALTH, Sync=$ROOT_SYNC"
+
+    if [[ "$ROOT_HEALTH" == "Healthy" && "$ROOT_SYNC" == "Synced" ]]; then
+        echo "✅ All waves successfully deployed and healthy!"
         break
     fi
-    sleep 20
+
+    # Wait for resources to stabilize before next nudge
+    sleep 30
 done
 
 # 3. Final Endpoint Verification
