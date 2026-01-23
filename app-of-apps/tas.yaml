@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: tas-service
-  namespace: openshift-gitops
+  namespace: gitops-resources
   annotations:
     argocd.argoproj.io/refresh: "hard"
     argocd.argoproj.io/sync-wave: "3"
@@ -17,7 +17,7 @@ spec:
   template:
     metadata:
       name: 'tas'
-      namespace: openshift-gitops
+      namespace: gitops-resources
     spec:
       project: gitops-resources
       destination:
@@ -55,3 +55,4 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
+          - ApplyOutOfSyncOnly=true
