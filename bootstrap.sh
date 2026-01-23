@@ -38,7 +38,7 @@ spec:
 }
 
 apply_custom_health_checks() {
-    echo "--- Phase 1: Applying Global Health & Tracking Logic ---"
+    echo "Applying Global Health & Tracking Logic ---"
     local NS="openshift-gitops"
     local INSTANCE="openshift-gitops"
 
@@ -150,10 +150,10 @@ for i in {1..3}; do
     echo "Sync/Nudge attempt $i..."
     
     # Nudge the Root to claim children
-    kubectl annotate app rhads-services-app-of-apps -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+    kubectl annotate app rhads-services-app-of-apps -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
     
     # Nudge all generated ApplicationSets to calculate health
-    kubectl annotate appset --all -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+    kubectl annotate appset --all -n gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
     
     # Trigger a sync to move to the next wave if the current wave is healthy
     argocd app sync rhads-services-app-of-apps --prune --async 2>/dev/null || true
@@ -165,8 +165,8 @@ echo "--- Phase 2: Nudging Waves ---"
 for i in {1..5}; do
     echo "Wave Sync Attempt $i..."
     # Nudge Parent & Children
-    kubectl annotate app rhads-services-app-of-apps -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
-    kubectl annotate appset --all -n openshift-gitops "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+    kubectl annotate app rhads-services-app-of-apps -n  gitops-resources"argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
+    kubectl annotate appset --all -n  gitops-resources "argocd.argoproj.io/refresh=hard" --overwrite 2>/dev/null
     
     # Trigger Sync to move waves
     argocd app sync rhads-services-app-of-apps --prune --async 2>/dev/null || true
