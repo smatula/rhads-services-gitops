@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: keycloak-foundation
-  namespace: gitops-resources
+  namespace: openshift-gitops
   annotations:
     argocd.argoproj.io/refresh: "hard"
     argocd.argoproj.io/sync-wave: "1"
@@ -17,7 +17,7 @@ spec:
   template:
     metadata:
       name: 'keycloak'
-      namespace: gitops-resources
+      namespace: openshift-gitops
     spec:
       project: gitops-resources
       destination:
