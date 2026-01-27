@@ -2,10 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: tpa-service
-  namespace: openshift-gitops
-  annotations:
-    argocd.argoproj.io/refresh: "hard"
-    argocd.argoproj.io/sync-wave: "3"
+  namespace: gitops-resources
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -17,7 +14,7 @@ spec:
   template:
     metadata:
       name: 'tpa'
-      namespace: openshift-gitops
+      namespace: gitops-resources
     spec:
       project: gitops-resources
       destination:
