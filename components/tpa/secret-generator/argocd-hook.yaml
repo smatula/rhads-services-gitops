@@ -1,4 +1,3 @@
----
 # ArgoCD Sync Hook - Generates secrets during deployment
 #
 # This hook generates 3 secrets with passwords and credentials at runtime.
@@ -195,3 +194,363 @@ spec:
               echo "Summary:"
               echo "  - 3 Secrets created"
               echo "  - Cluster domain: $INGRESS_DOMAIN"
+---
+# ArgoCD Sync Hook - Generates secrets during deployment
+#
+# This hook generates a secret with passwords and credentials at runtime.
+# It preserves existing passwords (idempotent) if secrets already exist.
+#
+# Runs in sync-wave 1 (after RBAC resources in wave 0, before app resources in wave 2+)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-generate-secrets
+  namespace: tssc-keycloak
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      name: keycloak-generate-secrets
+    spec:
+      restartPolicy: Never
+      serviceAccountName: keycloak-secret-generator
+      containers:
+        - name: generator
+          image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "========================================"
+              echo "KEYCLOAK Secret Generator - Starting"
+              echo "========================================"
+
+              # Set namespace variables
+              KEYCLOAK_NAMESPACE="tssc-keycloak"
+
+              echo "Configuration:"
+              echo "  Keycloak Namespace: $KEYCLOAK_NAMESPACE"
+              echo ""
+
+              # Get ingress domain
+              echo "Querying cluster for ingress domain..."
+              INGRESS_DOMAIN=$(oc -n openshift-ingress-operator get ingresscontrollers.operator.openshift.io default -o jsonpath='{.status.domain}')
+              echo "  Ingress Domain: $INGRESS_DOMAIN"
+              echo ""
+
+              # Derive values for secret generation
+              echo ""
+              echo "Checking if secrets already exist..."
+
+              # Check each secret individually for better debug output
+              DB_EXISTS=false
+
+              if oc get secret keycloak-pgsql-user -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret keycloak-pgsql-user exists"
+                DB_EXISTS=true
+              else
+                echo "  ✗ Secret keycloak-pgsql-user does not exist"
+              fi
+
+              echo ""
+
+              # Exit early if all secrets exist
+              if [ "$DB_EXISTS" = true ]; then
+                echo "All secrets already exist - skipping secret generation"
+                echo "========================================"
+                echo ""
+                echo "Summary:"
+                echo "  - Secrets already exist (skipped)"
+                echo "  - Cluster domain: $INGRESS_DOMAIN"
+                exit 0
+              fi
+
+              echo "Some secrets missing - proceeding with full generation"
+              echo "========================================"
+              echo ""
+
+              # Function to get existing secret or generate new
+              get_or_generate_password() {
+                local namespace=$1
+                local name=$2
+                local key=$3
+                local length=${4:-16}
+
+                existing=$(oc get secret "$name" -n "$namespace" -o jsonpath="{.data.$key}" 2>/dev/null | base64 -d || echo "")
+                if [ -n "$existing" ]; then
+                  echo "  Reusing existing password for $name/$key" >&2
+                  echo "$existing"
+                else
+                  echo "  Generating new password for $name/$key" >&2
+                  openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c "$length"
+                fi
+              }
+
+              get_or_generate_uuid_password() {
+                local namespace=$1
+                local name=$2
+                local key=$3
+
+                existing=$(oc get secret "$name" -n "$namespace" -o jsonpath="{.data.$key}" 2>/dev/null | base64 -d || echo "")
+                if [ -n "$existing" ]; then
+                  echo "  Reusing existing password for $name/$key" >&2
+                  echo "$existing"
+                else
+                  echo "  Generating new UUID-style password for $name/$key" >&2
+                  random=$(openssl rand -base64 64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+                  echo "${random:0:8}-${random:8:4}-${random:12:4}-${random:16:4}-${random:20:12}"
+                fi
+              }
+
+              # Generate or reuse passwords
+              echo "Processing passwords..."
+              KEYCLOAK_USER_DB_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "keycloak-pgsql-user" "password" 16)
+              echo ""
+
+              # Create all secrets
+              echo "Creating secrets..."
+              oc apply -f - <<EOF
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                name: keycloak-pgsql-user
+                namespace: $KEYCLOAK_NAMESPACE
+              stringData:
+                dbname: keycloak
+                host: keycloak-pgsql.tssc-keycloak.svc
+                user: keycloak
+                port: "5432"
+                password: "$KEYCLOAK_USER_DB_PASS"
+              EOF
+              echo "✓ All secrets created/updated"
+              echo ""
+
+              echo "========================================"
+              echo "Secret generation completed successfully!"
+              echo "========================================"
+              echo ""
+              echo "Summary:"
+              echo "  - 1 Secrets created"
+              echo "  - Cluster domain: $INGRESS_DOMAIN"
+---
+# ArgoCD Sync Hook - Generates secrets during deployment
+#
+# This hook generates 4 secrets with passwords and credentials at runtime.
+# It preserves existing passwords (idempotent) if secrets already exist.
+#
+# Runs in sync-wave 1 (after RBAC resources in wave 0, before app resources in wave 2+)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-config-generate-secrets
+  namespace: tssc-keycloak
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      name: keycloak-config-generate-secrets
+    spec:
+      restartPolicy: Never
+      serviceAccountName: keycloak-config-secret-generator
+      containers:
+        - name: generator
+          image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "========================================"
+              echo "KEYCLOAK Secret Generator - Starting"
+              echo "========================================"
+
+              # Set namespace variables
+              KEYCLOAK_NAMESPACE="tssc-keycloak"
+              REALM="chicken"
+
+              echo "Configuration:"
+              echo "  Keycloak Namespace: $KEYCLOAK_NAMESPACE"
+              echo "  Realm: $REALM"
+              echo ""
+
+              # Get ingress domain
+              echo "Querying cluster for ingress domain..."
+              INGRESS_DOMAIN=$(oc -n openshift-ingress-operator get ingresscontrollers.operator.openshift.io default -o jsonpath='{.status.domain}')
+              echo "  Ingress Domain: $INGRESS_DOMAIN"
+              echo ""
+
+              # Derive values for secret generation
+              echo ""
+              echo "Checking if secrets already exist..."
+
+              # Check each secret individually for better debug output
+              REALM_CLIENTS_EXISTS=false
+              TAS_USER_EXISTS=false
+              TAS_CLIENTS_EXISTS=false
+
+              if oc get secret tpa-realm-chicken-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret tpa-realm-chicken-clients exists"
+                REALM_CLIENTS_EXISTS=true
+              else
+                echo "  ✗ Secret tpa-realm-chicken-clients does not exist"
+              fi
+
+              if oc get secret trusted-artifact-signer-user -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-user exists"
+                TAS_USER_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-user does not exist"
+              fi
+
+              if oc get secret trusted-artifact-signer-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-clients exists"
+                TAS_CLIENTS_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-clients does not exist"
+              fi
+
+              echo ""
+
+              # Exit early if all secrets exist
+              if [ "$REALM_CLIENTS_EXISTS" = true ] && [ "$TAS_USER_EXISTS" = true ] && [ "$TAS_CLIENTS_EXISTS" = true ]; then
+                echo "All secrets already exist - skipping secret generation"
+                echo "========================================"
+                echo ""
+                echo "Summary:"
+                echo "  - Secrets already exist (skipped)"
+                echo "  - Cluster domain: $INGRESS_DOMAIN"
+                exit 0
+              fi
+
+              echo "Some secrets missing - proceeding with full generation"
+              echo "========================================"
+              echo ""
+
+              # Function to get existing secret or generate new
+              get_or_generate_password() {
+                local namespace=$1
+                local name=$2
+                local key=$3
+                local length=${4:-16}
+
+                existing=$(oc get secret "$name" -n "$namespace" -o jsonpath="{.data.$key}" 2>/dev/null | base64 -d || echo "")
+                if [ -n "$existing" ]; then
+                  echo "  Reusing existing password for $name/$key" >&2
+                  echo "$existing"
+                else
+                  echo "  Generating new password for $name/$key" >&2
+                  openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c "$length"
+                fi
+              }
+
+              get_or_generate_uuid_password() {
+                local namespace=$1
+                local name=$2
+                local key=$3
+
+                existing=$(oc get secret "$name" -n "$namespace" -o jsonpath="{.data.$key}" 2>/dev/null | base64 -d || echo "")
+                if [ -n "$existing" ]; then
+                  echo "  Reusing existing password for $name/$key" >&2
+                  echo "$existing"
+                else
+                  echo "  Generating new UUID-style password for $name/$key" >&2
+                  random=$(openssl rand -base64 64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+                  echo "${random:0:8}-${random:8:4}-${random:12:4}-${random:16:4}-${random:20:12}"
+                fi
+              }
+
+              # Generate or reuse passwords
+              echo "Processing passwords..."
+              SEED_STRING=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-admin" "password" 16)
+              PASS_CLI=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "cli")
+              PASS_MANAGER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
+              PASS_USER=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
+              TAS_USER_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
+              TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
+
+              echo ""
+
+              # Create all secrets
+              echo "Creating secrets..."
+              oc apply -f - <<EOF
+              ---
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: tpa-realm-chicken-admin
+              type: Opaque
+              stringData:
+                username: admin
+                password: $SEED_STRING
+              ---
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: tpa-realm-chicken-clients
+              type: Opaque
+              stringData:
+                cli: $PASS_CLI
+                testingManager: $PASS_MANAGER
+                testingUser: $PASS_USER
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: trusted-artifact-signer
+                password: "$TAS_USER_PASS"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-clients
+              stringData:
+                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
+              EOF
+              echo "✓ All secrets created/updated"
+              echo ""
+
+              echo "========================================"
+              echo "Secret generation completed successfully!"
+              echo "========================================"
+              echo ""
+              echo "Summary:"
+              echo "  - 4 Secrets created"
+              echo "  - Cluster domain: $INGRESS_DOMAIN"
+

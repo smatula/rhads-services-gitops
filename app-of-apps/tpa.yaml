@@ -26,7 +26,7 @@ spec:
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/tpa
-        targetRevision: tas-tpa-keycloak
+        targetRevision: oneAppSet
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
@@ -47,6 +47,82 @@ spec:
               target:
                 kind: Application
                 name: trusted-profile-analyzer
+            - patch: |
+                - op: replace
+                  path: /spec/host
+                  # Keycloak hostname patch
+                  value: "{{ index .metadata.annotations "KChost" }}"
+              target:
+                kind: Route
+                name: keycloak
+            - patch: |
+                - op: replace
+                  path: /spec/hostname/hostname
+                  # Keycloak hostname patch
+                  value: "{{ index .metadata.annotations "KChost" }}"
+              target:
+                kind: Keycloak
+                name: keycloak
+            - patch: |
+                - op: replace
+                  path: /spec/realm/clients/4/redirectUris/1
+                  # Ensure clients are in expected order before deploying
+                  # Targets 5th client (index 4) in realm.clients; index 1 = TPA console callback URI
+                  value: "{{ index .metadata.annotations "redirect1" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/realm/clients/4/redirectUris/2
+                  # Ensure clients are in expected order before deploying
+                  # Targets 5th client (index 4) in realm.clients; index 2 = TPA console callback URI with wildcard
+                  value: "{{ index .metadata.annotations "redirect2" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/realm/clients/4/redirectUris/3
+                  # Ensure clients are in expected order before deploying
+                  # Targets 5th client (index 4) in realm.clients; index 3 = TPA callback URI
+                  value: "{{ index .metadata.annotations "redirect3" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/realm/clients/4/redirectUris/4
+                  # Ensure clients are in expected order before deploying
+                  # Targets 5th client (index 4) in realm.clients; index 4 = TPA callback URI with wildcard
+                  value: "{{ index .metadata.annotations "redirect4" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/realm/users/4/email
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/Issuer
+                  # Securesign Isuer patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
+                  # Securesign IssuerURL patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
       syncPolicy:
         managedNamespaceMetadata:
           labels:

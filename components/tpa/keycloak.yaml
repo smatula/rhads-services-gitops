@@ -1,18 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: rhads-services-app-of-apps
+  name: keycloak-foundation
   namespace: gitops-resources
 spec:
   destination:
-    namespace: gitops-resources
+    namespace: tssc-keycloak
     server: https://kubernetes.default.svc
   project: gitops-resources
   source:
-    path: ./app-of-apps
-    repoURL: https://github.com/smatula/rhads-services-gitops.git
+    path: ./components/tpa/keycloak
+    repoURL: https://github.com/smatula/rhads-services-gitops
     targetRevision: oneAppSet
   syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/managed-by: openshift-gitops
     automated:
       prune: true
       selfHeal: true

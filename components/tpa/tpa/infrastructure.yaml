@@ -4,7 +4,7 @@ metadata:
   name: tpa-pgsql-data
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   accessModes:
     - ReadWriteOnce
@@ -18,7 +18,7 @@ metadata:
   name: tpa-pgsql
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   type: ClusterIP
   ports:
@@ -34,7 +34,7 @@ metadata:
   name: tpa-pgsql-bee
   namespace: tssc-tpa
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   selector:
     matchLabels:
