@@ -7,7 +7,8 @@ resources:
   - namespaces.yaml
   - secret-generator/rbac.yaml
   - secret-generator/argocd-hook.yaml
-  - keycloak.yaml
+  - keycloak/
   - keycloak-config/
-  - tas.yaml
   - tpa/
+  - tas.yaml
+
