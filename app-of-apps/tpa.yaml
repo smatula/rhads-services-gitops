@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: tpa-service
-  namespace: gitops-resources
+  namespace: openshift-gitops
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -130,4 +130,3 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
-          - ApplyOutOfSyncOnly=true
