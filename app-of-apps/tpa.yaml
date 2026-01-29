@@ -27,23 +27,8 @@ spec:
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
+            # - KeycloakRealmImport keycloak-chicken: realm.clients length >= 5, clients[4].redirectUris length >= 5
             # - Application trusted-profile-analyzer: source.helm.parameters length == 2
-            - patch: |
-                - op: replace
-                  path: /spec/source/helm/parameters/0/value
-                  # Helm parameter 0 = AppDomain (e.g., "tpa.example.com")
-                  value: "{{ index .metadata.annotations "AppDomain" }}"
-              target:
-                kind: Application
-                name: trusted-profile-analyzer
-            - patch: |
-                - op: replace
-                  path: /spec/source/helm/parameters/1/value
-                  # Helm parameter 1 = OIDCissuer (Keycloak realm issuer URL)
-                  value: "{{ index .metadata.annotations "OIDCissuer" }}"
-              target:
-                kind: Application
-                name: trusted-profile-analyzer
             - patch: |
                 - op: replace
                   path: /spec/host
@@ -96,6 +81,22 @@ spec:
               target:
                 kind: KeycloakRealmImport
                 name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/source/helm/parameters/0/value
+                  # Helm parameter 0 = AppDomain (e.g., "tpa.example.com")
+                  value: "{{ index .metadata.annotations "AppDomain" }}"
+              target:
+                kind: Application
+                name: trusted-profile-analyzer
+            - patch: |
+                - op: replace
+                  path: /spec/source/helm/parameters/1/value
+                  # Helm parameter 1 = OIDCissuer (Keycloak realm issuer URL)
+                  value: "{{ index .metadata.annotations "OIDCissuer" }}"
+              target:
+                kind: Application
+                name: trusted-profile-analyzer
             - patch: |
                 - op: replace
                   path: /spec/realm/users/4/email
