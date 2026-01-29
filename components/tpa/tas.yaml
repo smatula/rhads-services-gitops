@@ -4,7 +4,7 @@ metadata:
   name: tas-service
   namespace: gitops-resources
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "6"
 spec:
   destination:
     namespace: trusted-artifact-signer
