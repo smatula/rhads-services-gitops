@@ -23,7 +23,7 @@ spec:
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/tpa
-        targetRevision: oneAppSet
+        targetRevision: oneAppSet2
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
