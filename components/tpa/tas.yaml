@@ -13,7 +13,7 @@ spec:
   source:
     path: ./components/tpa/tas
     repoURL: https://github.com/smatula/rhads-services-gitops
-    targetRevision: oneAppSet
+    targetRevision: oneAppSet2
   syncPolicy:
     managedNamespaceMetadata:
       labels:
