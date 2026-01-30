@@ -11,7 +11,7 @@ spec:
   source:
     path: ./components/nexus
     repoURL: https://github.com/smatula/rhads-services-gitops
-    targetRevision: tas-tpa-keycloak
+    targetRevision: oneAppSet2
   syncPolicy:
     managedNamespaceMetadata:
       labels:
