@@ -12,8 +12,8 @@ spec:
   project: gitops-resources
   source:
     path: ./components/trust-apps/tas
-    repoURL: https://github.com/smatula/rhads-services-gitops
-    targetRevision: oneAppSet2
+    repoURL: https://github.com/redhat-appstudio/rhads-services-gitops
+    targetRevision: main
   syncPolicy:
     managedNamespaceMetadata:
       labels:

@@ -10,8 +10,8 @@ spec:
   project: gitops-resources
   source:
     path: ./components/nexus
-    repoURL: https://github.com/smatula/rhads-services-gitops
-    targetRevision: tas-tpa-keycloak
+    repoURL: https://github.com/redhat-appstudio/rhads-services-gitops
+    targetRevision: main
   syncPolicy:
     managedNamespaceMetadata:
       labels:

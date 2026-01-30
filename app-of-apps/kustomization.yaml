@@ -3,9 +3,9 @@ kind: Kustomization
 commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 resources:
-  #- multicluster-engine.yaml
-  #- jfrog-artifactory-jcr.yaml
-  #- nexus.yaml
-  #- jenkins.yaml
-  #- acs.yaml
+  - multicluster-engine.yaml
+  - jfrog-artifactory-jcr.yaml
+  - nexus.yaml
+  - jenkins.yaml
+  - acs.yaml
   - trust-apps.yaml
