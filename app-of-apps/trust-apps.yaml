@@ -99,12 +99,12 @@ spec:
                 name: trusted-profile-analyzer
             - patch: |
                 - op: replace
-                  path: /spec/realm/users/4/email
+                  path: /spec/realm/users/0/email
                   # TAS email patch
                   value: "{{ index .metadata.annotations "tasEmail" }}"
               target:
                 kind: KeycloakRealmImport
-                name: keycloak-chicken
+                name: trusted-artifact-signer
             - patch: |
                 - op: replace
                   path: /spec/fulcio/config/OIDCIssuers/0/Issuer

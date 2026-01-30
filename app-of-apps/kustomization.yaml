@@ -8,4 +8,4 @@ resources:
   - nexus.yaml
   #- jenkins.yaml
   #- acs.yaml
-  #- trust-apps.yaml
+  - trust-apps.yaml
