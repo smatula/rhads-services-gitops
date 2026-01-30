@@ -11,7 +11,7 @@ spec:
     server: https://kubernetes.default.svc
   project: gitops-resources
   source:
-    path: ./components/tpa/tas
+    path: ./components/trust-apps/tas
     repoURL: https://github.com/smatula/rhads-services-gitops
     targetRevision: oneAppSet2
   syncPolicy:
