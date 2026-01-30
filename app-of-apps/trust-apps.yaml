@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: tpa-service
+  name: trust-services
   namespace: openshift-gitops
 spec:
   goTemplate: true
@@ -13,7 +13,7 @@ spec:
             cluster-service-app: "true"
   template:
     metadata:
-      name: 'tpa'
+      name: 'trust-apps'
       namespace: gitops-resources
     spec:
       project: gitops-resources
@@ -22,7 +22,7 @@ spec:
         namespace: tssc-tpa
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
-        path: ./components/tpa
+        path: ./components/trust-apps
         targetRevision: oneAppSet2
         kustomize:
           patches:
