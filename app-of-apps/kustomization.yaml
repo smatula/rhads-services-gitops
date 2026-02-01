@@ -5,7 +5,7 @@ commonAnnotations:
 resources:
   #- multicluster-engine.yaml
   #- jfrog-artifactory-jcr.yaml
-  - nexus.yaml
+  #- nexus.yaml
   #- jenkins.yaml
   #- acs.yaml
   - trust-apps.yaml
