@@ -104,7 +104,7 @@ spec:
                   value: "{{ index .metadata.annotations "tasEmail" }}"
               target:
                 kind: KeycloakRealmImport
-                name: trusted-artifact-signer
+                name: keycloak-chicken
             - patch: |
                 - op: replace
                   path: /spec/fulcio/config/OIDCIssuers/0/Issuer
@@ -118,6 +118,14 @@ spec:
                   path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
                   # Securesign IssuerURL patch
                   value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/certificate/organizationEmail
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
               target:
                 kind: Securesign
                 name: trusted-artifact-signer

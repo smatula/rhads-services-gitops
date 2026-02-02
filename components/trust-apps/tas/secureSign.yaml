@@ -11,7 +11,7 @@ spec:
       enabled: true
     certificate:
       commonName: fulcio.hostname
-      organizationEmail:  trusted-artifact-signer@company.dev
+      organizationEmail: EMAIL_PLACEHOLDER
       organizationName: TSSC
     config:
       OIDCIssuers:
