@@ -260,6 +260,20 @@ spec:
                 labels:
                   app: keycloak
                 namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: admin
+                password: "$SEED_STRING"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
                 name: trusted-artifact-signer-clients
               stringData:
                 trustedArtifactSigner: "$TAS_CLIENT_SECRET"
