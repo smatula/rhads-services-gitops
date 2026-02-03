@@ -22,7 +22,7 @@ TPA_NAMESPACE="tssc-tpa"
 REALM="chicken"
 
 # Set TAS variables
-TAS_REALM="tssc-iam"
+TAS_REALM="chicken"
 
 # Derive annotation values
 export APP_DOMAIN_URL="-${TPA_NAMESPACE}.${INGRESS_DOMAIN}"
