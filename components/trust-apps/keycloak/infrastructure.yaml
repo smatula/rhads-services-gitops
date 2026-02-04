@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-pgsql-data
+  namespace: tssc-keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-pgsql
+  namespace: tssc-keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  type: ClusterIP
+  ports:
+    - name: data
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: keycloak-pgsql-bee
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-pgsql-bee
+  namespace: tssc-keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  selector:
+    matchLabels:
+      app: keycloak-pgsql-bee
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: keycloak-pgsql-bee
+        phase: reference
+    spec:
+      volumes:
+        - name: pgsql-storage
+          persistentVolumeClaim:
+            claimName: keycloak-pgsql-data
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: keycloak-pgsql-bee
+          image: 'registry.redhat.io/rhel9/postgresql-16:1-1754433677'
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: password
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-pgsql-user
+                  key: dbname
+          volumeMounts:
+            - name: pgsql-storage
+              mountPath: "/var/lib/pgsql/data"
+          ports:
+            - containerPort: 5432
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
