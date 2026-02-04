@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: tpa-service
+  name: trust-services
   namespace: openshift-gitops
 spec:
   goTemplate: true
@@ -11,11 +11,9 @@ spec:
         selector:
           matchLabels:
             cluster-service-app: "true"
-  syncPolicy:
-    preserveResourcesOnDeletion: true 
   template:
     metadata:
-      name: 'tpa'
+      name: 'trust-apps'
       namespace: gitops-resources
     spec:
       project: gitops-resources
@@ -24,7 +22,7 @@ spec:
         namespace: tssc-tpa
       source:
         repoURL: https://github.com/smatula/rhads-services-gitops
-        path: ./components/tpa
+        path: ./components/trust-apps
         targetRevision: test_main
         kustomize:
           patches:
@@ -99,6 +97,38 @@ spec:
               target:
                 kind: Application
                 name: trusted-profile-analyzer
+            - patch: |
+                - op: replace
+                  path: /spec/realm/users/0/email
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
+              target:
+                kind: KeycloakRealmImport
+                name: keycloak-chicken
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/Issuer
+                  # Securesign Isuer patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/config/OIDCIssuers/0/IssuerURL
+                  # Securesign IssuerURL patch
+                  value: "{{ index .metadata.annotations "tasIssuer" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
+            - patch: |
+                - op: replace
+                  path: /spec/fulcio/certificate/organizationEmail
+                  # TAS email patch
+                  value: "{{ index .metadata.annotations "tasEmail" }}"
+              target:
+                kind: Securesign
+                name: trusted-artifact-signer
       syncPolicy:
         managedNamespaceMetadata:
           labels:
@@ -109,4 +139,3 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
-

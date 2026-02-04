@@ -1,0 +1,39 @@
+apiVersion: rhtas.redhat.com/v1alpha1
+kind: Securesign
+metadata:
+  name: trusted-artifact-signer
+  namespace: trusted-artifact-signer
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  fulcio:
+    externalAccess:
+      enabled: true
+    certificate:
+      commonName: fulcio.hostname
+      organizationEmail: EMAIL_PLACEHOLDER
+      organizationName: TSSC
+    config:
+      OIDCIssuers:
+        - ClientID: trusted-artifact-signer
+          Issuer: ISSUER_PLACEHOLDER
+          IssuerURL: ISSUER_PLACEHOLDER
+          Type: email
+  rekor:
+    externalAccess:
+      enabled: true
+    rekorSearchUI:
+      enabled: true
+    signer:
+      kms: secret
+  trillian:
+    database:
+      create: true
+  tuf:
+    externalAccess:
+      enabled: true
+    port: 80
+    keys:
+      - name: rekor.pub
+      - name: ctfe.pub
+      - name: fulcio_v1.crt.pem
