@@ -4,5 +4,5 @@ commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 resources:
   #- jfrog-artifactory-jcr.yaml
-  #- nexus.yaml
+  - nexus.yaml
   - tpa.yaml
