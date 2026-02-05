@@ -10,7 +10,7 @@ spec:
   project: gitops-resources
   sources:
     - repoURL: 'https://github.com/smatula/rhads-services-gitops'
-      targetRevision: test_main
+      targetRevision: final_tas_test
       path: 'components/artifactory'
     - repoURL: https://charts.jfrog.io
       chart: artifactory-jcr
@@ -20,7 +20,7 @@ spec:
         valueFiles:
           - $values/components/artifactory/values.yaml
     - repoURL: https://github.com/smatula/rhads-services-gitops
-      targetRevision: test_main
+      targetRevision: final_tas_test
       ref: values
   syncPolicy:
     managedNamespaceMetadata:
