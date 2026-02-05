@@ -4,11 +4,6 @@ commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 # Secrets are generated at runtime by ArgoCD Sync hook (see secret-generator/argocd-hook.yaml)
 resources:
-  - namespaces.yaml
-  - secret-generator/rbac.yaml
-  - secret-generator/argocd-hook.yaml
+  - operatorGroup.yaml
   - subscription.yaml
-  - infrastructure.yaml
-  - keycloak-instance.yaml
-  - realm.yaml
-  - tpa-release.yaml
+  - secureSign.yaml

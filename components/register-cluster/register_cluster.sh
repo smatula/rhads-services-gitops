@@ -17,9 +17,12 @@ export CA_DATA
 BTOKEN=$(kubectl get secret cluster-argocd-manager-token -n kube-system -o jsonpath="{.data.token}" | base64 --decode)
 export BTOKEN
 
-# Set namespace variables
+# Set TPA variables
 TPA_NAMESPACE="tssc-tpa"
 REALM="chicken"
+
+# Set TAS variables
+TAS_REALM="chicken"
 
 # Derive annotation values
 export APP_DOMAIN_URL="-${TPA_NAMESPACE}.${INGRESS_DOMAIN}"
@@ -29,6 +32,8 @@ export REDIRECT_URI1="https://server${APP_DOMAIN_URL}"
 export REDIRECT_URI2="https://server${APP_DOMAIN_URL}/*"
 export REDIRECT_URI3="https://sbom${APP_DOMAIN_URL}"
 export REDIRECT_URI4="https://sbom${APP_DOMAIN_URL}/*"
+export TAS_EMAIL="admin@${INGRESS_DOMAIN}"
+export TAS_ISSUER_URL="https://${KEYCLOAK_HOST}/realms/${TAS_REALM}"
 
 # Add Cluster secret to register
 envsubst < components/register-cluster/cluster_secret.yaml | kubectl apply -f -

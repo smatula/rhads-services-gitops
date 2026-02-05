@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonAnnotations:
+  argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+# Secrets are generated at runtime by ArgoCD Sync hook (see secret-generator/argocd-hook.yaml)
+resources:
+  - namespaces.yaml
+  - secret-generator/rbac.yaml
+  - secret-generator/argocd-hook.yaml
+  - keycloak/
+  - keycloak-config/
+  - tpa/
+  - tas/
+

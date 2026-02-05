@@ -5,4 +5,4 @@ commonAnnotations:
 resources:
   #- jfrog-artifactory-jcr.yaml
   - nexus.yaml
-  - tpa.yaml
+  - trust-apps.yaml
