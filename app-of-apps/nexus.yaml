@@ -11,7 +11,7 @@ spec:
   source:
     path: ./components/nexus
     repoURL: https://github.com/smatula/rhads-services-gitops
-    targetRevision: final_tas_test
+    targetRevision: final_tas_test2
   syncPolicy:
     managedNamespaceMetadata:
       labels:

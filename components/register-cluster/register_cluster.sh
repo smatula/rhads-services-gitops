@@ -22,7 +22,7 @@ TPA_NAMESPACE="tssc-tpa"
 REALM="chicken"
 
 # Set TAS variables
-TAS_REALM="chicken"
+TAS_REALM="trusted-artifact-signer"
 
 # Derive annotation values
 export APP_DOMAIN_URL="-${TPA_NAMESPACE}.${INGRESS_DOMAIN}"
@@ -32,7 +32,7 @@ export REDIRECT_URI1="https://server${APP_DOMAIN_URL}"
 export REDIRECT_URI2="https://server${APP_DOMAIN_URL}/*"
 export REDIRECT_URI3="https://sbom${APP_DOMAIN_URL}"
 export REDIRECT_URI4="https://sbom${APP_DOMAIN_URL}/*"
-export TAS_EMAIL="admin@${INGRESS_DOMAIN}"
+export TAS_EMAIL="trusted-artifact-signer@${INGRESS_DOMAIN}"
 export TAS_ISSUER_URL="https://${KEYCLOAK_HOST}/realms/${TAS_REALM}"
 
 # Add Cluster secret to register

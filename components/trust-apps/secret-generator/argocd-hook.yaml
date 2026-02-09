@@ -143,6 +143,7 @@ spec:
               PASS_MANAGER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
               PASS_USER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
               TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
+              PASS_TAS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
 
               echo ""
 
@@ -262,8 +263,8 @@ spec:
                 namespace: $KEYCLOAK_NAMESPACE
                 name: trusted-artifact-signer-user
               stringData:
-                username: admin
-                password: "$SEED_STRING"
+                username: trusted-artifact-signer
+                password: "$PASS_TAS"
               ---
               apiVersion: v1
               kind: Secret
