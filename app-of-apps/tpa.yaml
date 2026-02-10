@@ -11,6 +11,8 @@ spec:
         selector:
           matchLabels:
             cluster-service-app: "true"
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   template:
     metadata:
       name: 'tpa'
