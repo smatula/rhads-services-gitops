@@ -21,9 +21,9 @@ spec:
         server: https://kubernetes.default.svc
         namespace: tssc-tpa
       source:
-        repoURL: https://github.com/redhat-appstudio/rhads-services-gitops
+        repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/tpa
-        targetRevision: HEAD
+        targetRevision: final_tas_test3
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
