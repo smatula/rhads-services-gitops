@@ -1,6 +1,6 @@
-# TPA Secret Generator
+# TPA/TAS Secret Generator
 
-This directory contains ArgoCD hooks to generate secrets and ConfigMaps for the TPA (Trusted Profile Analyzer) deployment.
+This directory contains ArgoCD hooks to generate secrets and ConfigMaps for the TPA/TAS (Trusted Profile Analyzer / Trusted Artifact Signer) deployment.
 
 ## Overview
 
@@ -29,12 +29,14 @@ When ArgoCD syncs the TPA application:
 
 ## Generated Resources
 
-### Secrets (7 total):
+### Secrets (9 total):
 1. `tpa-pgsql-user` - TPA database credentials
 2. `keycloak-pgsql-user` - Keycloak database credentials
 3. `tpa-realm-chicken-admin` (both namespaces) - Realm admin credentials
 4. `tpa-realm-chicken-clients` (both namespaces) - OIDC client secrets
 5. `tssc-trustification-integration` - Trustification config
+6. `trusted-artifact-signer-user` - TAS user credentials
+7. `trusted-artifact-signer-clients` - OIDC client secrets
 
 ### ConfigMap:
 - `tpa-values-source` - Environment-specific URLs and domains

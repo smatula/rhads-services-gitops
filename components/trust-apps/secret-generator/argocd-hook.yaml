@@ -1,7 +1,6 @@
----
 # ArgoCD Sync Hook - Generates secrets during deployment
 #
-# This hook generates 7 secrets with passwords and credentials at runtime.
+# This hook generates 9 secrets with passwords and credentials at runtime.
 # It preserves existing passwords (idempotent) if secrets already exist.
 #
 # Runs in sync-wave 1 (after RBAC resources in wave 0, before app resources in wave 2+)
@@ -62,6 +61,7 @@ spec:
               # Check each secret individually for better debug output
               TPA_DB_EXISTS=false
               REALM_CLIENTS_EXISTS=false
+              TAS_CLIENTS_EXISTS=false
 
               if oc get secret tpa-pgsql-user -n "$TPA_NAMESPACE" &>/dev/null; then
                 echo "  ✓ Secret tpa-pgsql-user exists"
@@ -77,10 +77,17 @@ spec:
                 echo "  ✗ Secret tpa-realm-chicken-clients does not exist"
               fi
 
+              if oc get secret trusted-artifact-signer-clients -n "$KEYCLOAK_NAMESPACE" &>/dev/null; then
+                echo "  ✓ Secret trusted-artifact-signer-clients exists"
+                TAS_CLIENTS_EXISTS=true
+              else
+                echo "  ✗ Secret trusted-artifact-signer-clients does not exist"
+              fi
+
               echo ""
 
               # Exit early if all secrets exist
-              if [ "$TPA_DB_EXISTS" = true ] && [ "$REALM_CLIENTS_EXISTS" = true ]; then
+              if [ "$TPA_DB_EXISTS" = true ] && [ "$REALM_CLIENTS_EXISTS" = true ] && [ "$TAS_CLIENTS_EXISTS" = true ]; then
                 echo "All secrets already exist - skipping secret generation"
                 echo "========================================"
                 echo ""
@@ -131,10 +138,13 @@ spec:
               echo "Processing passwords..."
               TPA_USER_DB_PASS=$(get_or_generate_password "$TPA_NAMESPACE" "tpa-pgsql-user" "password" 16)
               KEYCLOAK_USER_DB_PASS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "keycloak-pgsql-user" "password" 16)
-              SEED_STRING=$(get_or_generate_password "$TPA_NAMESPACE" "tpa-realm-chicken-admin" "password" 16)
+              SEED_STRING=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "tpa-realm-chicken-admin" "password" 16)
               PASS_CLI=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "cli")
               PASS_MANAGER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingManager")
               PASS_USER=$(get_or_generate_uuid_password "$TPA_NAMESPACE" "tpa-realm-chicken-clients" "testingUser")
+              TAS_CLIENT_SECRET=$(get_or_generate_uuid_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-clients" "trustedArtifactSigner")
+              PASS_TAS=$(get_or_generate_password "$KEYCLOAK_NAMESPACE" "trusted-artifact-signer-user" "password" 16)
+
               echo ""
 
               # Create all secrets
@@ -241,6 +251,33 @@ spec:
                 oidc_client_id: cli
                 oidc_client_secret: $PASS_CLI
                 supported_cyclonedx_version: "${CYCLONEDX_VER}"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-user
+              stringData:
+                username: trusted-artifact-signer
+                password: "$PASS_TAS"
+              ---
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              metadata:
+                annotations:
+                  helm.sh/resource-policy: keep
+                labels:
+                  app: keycloak
+                namespace: $KEYCLOAK_NAMESPACE
+                name: trusted-artifact-signer-clients
+              stringData:
+                trustedArtifactSigner: "$TAS_CLIENT_SECRET"
               EOF
               echo "✓ All secrets created/updated"
               echo ""
@@ -250,5 +287,6 @@ spec:
               echo "========================================"
               echo ""
               echo "Summary:"
-              echo "  - 7 Secrets created"
+              echo "  - 9 Secrets created"
               echo "  - Cluster domain: $INGRESS_DOMAIN"
+
