@@ -9,7 +9,6 @@ spec:
   project: gitops-resources
   source:
     repoURL: https://charts.openshift.io/
-    targetRevision: 2.2.1
     chart: redhat-trusted-profile-analyzer
     helm:
       parameters:
