@@ -24,6 +24,8 @@ spec:
         collector: {}
         ingress:
           className: openshift-default
+          termination: edge
+          insecureEdgeTerminationPolicy: Redirect
           additionalAnnotations:
             "haproxy.router.openshift.io/timeout": "5m"
 

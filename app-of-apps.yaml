@@ -10,8 +10,8 @@ spec:
   project: gitops-resources
   source:
     path: ./app-of-apps
-    repoURL: https://github.com/redhat-appstudio/rhads-services-gitops.git
-    targetRevision: main
+    repoURL: https://github.com/smatula/rhads-services-gitops.git
+    targetRevision: tpaUpgrade
   syncPolicy:
     automated:
       prune: true

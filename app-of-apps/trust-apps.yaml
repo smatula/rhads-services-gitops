@@ -21,9 +21,9 @@ spec:
         server: https://kubernetes.default.svc
         namespace: tssc-tpa
       source:
-        repoURL: https://github.com/redhat-appstudio/rhads-services-gitops
+        repoURL: https://github.com/smatula/rhads-services-gitops
         path: ./components/trust-apps
-        targetRevision: HEAD
+        targetRevision: tpaUpgrade
         kustomize:
           patches:
             # Validation note: Ensure target resources meet expected structure:
@@ -108,7 +108,7 @@ spec:
             - patch: |
                 - op: replace
                   path: /spec/fulcio/config/OIDCIssuers/0/Issuer
-                  # Securesign Isuer patch
+                  # Securesign Issuer patch
                   value: "{{ index .metadata.annotations "tasIssuer" }}"
               target:
                 kind: Securesign
